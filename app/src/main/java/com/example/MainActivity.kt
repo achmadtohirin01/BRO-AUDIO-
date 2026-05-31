@@ -49,6 +49,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.painterResource
 import androidx.core.content.ContextCompat
 import com.example.audio.AudioDspViewModel
 import com.example.audio.DspProcessor
@@ -167,26 +168,49 @@ fun BroAudioControlCenter(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
-                        Text(
-                            text = "BRO AUDIO",
-                            style = TextStyle(
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 24.sp,
-                                letterSpacing = 2.sp,
-                                shadow = Shadow(
-                                    color = activeTheme.primaryAccent,
-                                    blurRadius = 12f
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.app_logo_fg),
+                            contentDescription = "Bro Audio Logo",
+                            modifier = Modifier
+                                .size(46.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .border(
+                                    BorderStroke(1.2.dp, activeTheme.primaryAccent.copy(alpha = 0.6f)),
+                                    RoundedCornerShape(10.dp)
                                 )
-                            ),
-                            color = activeTheme.primaryAccent
+                                .background(Color.Black)
                         )
-                        Text(
-                            text = "SYSTEM AUDIO CAPTURE & AUDIO CROSSOVER",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+
+                        Column {
+                            Text(
+                                text = "BRO AUDIO",
+                                style = TextStyle(
+                                    brush = Brush.linearGradient(
+                                        colors = listOf(activeTheme.primaryAccent, Color.White)
+                                    ),
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 24.sp,
+                                    letterSpacing = 1.8.sp,
+                                    fontFamily = FontFamily.SansSerif,
+                                    shadow = Shadow(
+                                        color = activeTheme.primaryAccent.copy(alpha = 0.5f),
+                                        blurRadius = 10f
+                                    )
+                                )
+                            )
+                            Text(
+                                text = "SYSTEM AUDIO CAPTURE & CROSSOVER",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 8.sp,
+                                letterSpacing = 0.5.sp,
+                                fontFamily = FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
 
                     // Theme selector triggers inside header
