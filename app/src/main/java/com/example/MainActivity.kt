@@ -116,7 +116,7 @@ fun BroAudioControlCenter(
         if (result.resultCode == Activity.RESULT_OK && result.data != null && mpManager != null) {
             viewModel.toggleAudioPlayback(context, mpManager, result.resultCode, result.data)
         } else {
-            Toast.makeText(context, "System audio stream fallback: Synthesizer Active", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Audio Capture started. Launch YouTube to process sound.", Toast.LENGTH_SHORT).show()
             viewModel.toggleAudioPlayback(context)
         }
     }
@@ -135,7 +135,7 @@ fun BroAudioControlCenter(
                 viewModel.toggleAudioPlayback(context)
             }
         } else {
-            Toast.makeText(context, "Permission denied. Outputting micro beats.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Permission denied. Audio capture is in silent standby mode.", Toast.LENGTH_SHORT).show()
             viewModel.toggleAudioPlayback(context)
         }
     }
@@ -505,7 +505,8 @@ fun BroAudioControlCenter(
 }
 
 /**
- * 18-Band Bi-Quad Peaking Equalizer dashboard panel
+ * Dual-Mode (Simple 5-Band / Pro 18-Band) graphic equalizer panel.
+ * Simple View presents classic horizontal/vertical sliding capsules for quick adjustments.
  */
 @Composable
 fun EqualizerPanel(
@@ -515,6 +516,36 @@ fun EqualizerPanel(
 ) {
     val currentBands = settings.getEqList()
     val presets = listOf("Flat", "Bass Boost", "Vocal Boost", "Treble Boost", "Electronic", "Acoustic")
+    var isSimpleView by remember { mutableStateOf(true) }
+
+    // Aggregate 18 bands into 5 common groups for easy use
+    val groups = listOf(0..5, 6..9, 10..12, 13..15, 16..17)
+    val groupLabels = listOf("BASS", "LOW-MID", "MID", "PRESENCE", "TREBLE")
+    val groupFreqs = listOf("60 Hz", "200 Hz", "1.0 kHz", "3.0 kHz", "12 kHz")
+
+    val simpleValues = groups.map { range ->
+        var sum = 0f
+        var count = 0
+        for (i in range) {
+            if (i in currentBands.indices) {
+                sum += currentBands[i]
+                count++
+            }
+        }
+        if (count > 0) sum / count else 0f
+    }
+
+    val updateSimpleBand: (Int, Float) -> Unit = { groupIndex, newValue ->
+        val updatedList = currentBands.toMutableList()
+        val range = groups[groupIndex]
+        for (i in range) {
+            if (i in updatedList.indices) {
+                updatedList[i] = newValue
+            }
+        }
+        val eqString = updatedList.joinToString(",") { String.format("%.1f", it) }
+        viewModel.updateWholeEq(eqString)
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -526,13 +557,14 @@ fun EqualizerPanel(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // Header: Title and Reset button
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "18-BAND GRAPHIC EQUALIZER",
+                    text = if (isSimpleView) "SIMPLE 5-BAND EQUALIZER" else "18-BAND GRAPHIC EQUALIZER",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace,
@@ -549,6 +581,44 @@ fun EqualizerPanel(
                         tint = theme.primaryAccent,
                         modifier = Modifier.size(16.dp)
                     )
+                }
+            }
+
+            // View Mode Toggle (Simple 5-Band vs Pro 18-Band Slider Selector)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(theme.trackBackground.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Button(
+                    onClick = { isSimpleView = true },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(32.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isSimpleView) theme.primaryAccent else Color.Transparent,
+                        contentColor = if (isSimpleView) Color.Black else theme.onSurface.copy(alpha = 0.6f)
+                    ),
+                    shape = RoundedCornerShape(6.dp),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Text("SIMPLE (5-BAND)", fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                }
+                Button(
+                    onClick = { isSimpleView = false },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(32.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (!isSimpleView) theme.primaryAccent else Color.Transparent,
+                        contentColor = if (!isSimpleView) Color.Black else theme.onSurface.copy(alpha = 0.6f)
+                    ),
+                    shape = RoundedCornerShape(6.dp),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Text("PRO (18-BAND)", fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                 }
             }
 
@@ -576,62 +646,141 @@ fun EqualizerPanel(
                 }
             }
 
-            // Scrollable 18-Band Slider Row
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                DspProcessor.EQ_FREQUENCIES.forEachIndexed { index, freq ->
-                    val gainVal = if (index < currentBands.size) currentBands[index] else 0.0f
-                    
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.width(36.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = if (gainVal >= 0) "+${String.format("%.1f", gainVal)}" else String.format("%.1f", gainVal),
-                            fontSize = 9.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = theme.primaryAccent,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        // Vertical slider component
-                        Box(
-                            modifier = Modifier
-                                .height(160.dp)
-                                .width(31.dp),
-                            contentAlignment = Alignment.Center
+            // EQ Sliders
+            if (isSimpleView) {
+                // Simplified 5-Band Slider Panel (Fits perfectly side-by-side with no scrolling)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    simpleValues.forEachIndexed { groupIndex, gainVal ->
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Slider(
-                                value = gainVal,
-                                onValueChange = { viewModel.updateEqBandValue(index, it) },
-                                valueRange = -12f..12f,
-                                colors = SliderDefaults.colors(
-                                    thumbColor = theme.primaryAccent,
-                                    activeTrackColor = theme.primaryAccent,
-                                    inactiveTrackColor = theme.trackBackground
-                                ),
+                            // Current dB status
+                            Text(
+                                text = if (gainVal >= 0) "+${String.format("%.1f", gainVal)}" else String.format("%.1f", gainVal),
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Monospace,
+                                color = theme.primaryAccent,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            // Slider container formatted as standard physical board slot capsule
+                            Box(
                                 modifier = Modifier
-                                    .graphicsLayer {
-                                        rotationZ = -90f
-                                    }
-                                    .width(160.dp)
-                                    .testTag("eq_slider_${index}")
+                                    .height(180.dp)
+                                    .width(42.dp)
+                                    .background(theme.trackBackground.copy(alpha = 0.5f), RoundedCornerShape(22.dp))
+                                    .border(1.dp, Color(0xFF32353A), RoundedCornerShape(22.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                // Background slider vertical path guide slot
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .width(3.dp)
+                                        .background(Color(0xFF43474F).copy(alpha = 0.4f))
+                                )
+
+                                Slider(
+                                    value = gainVal,
+                                    onValueChange = { updateSimpleBand(groupIndex, it) },
+                                    valueRange = -12f..12f,
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = theme.primaryAccent,
+                                        activeTrackColor = theme.primaryAccent,
+                                        inactiveTrackColor = Color.Transparent
+                                    ),
+                                    modifier = Modifier
+                                        .graphicsLayer { rotationZ = -90f }
+                                        .width(180.dp)
+                                        .testTag("simple_slider_$groupIndex")
+                                )
+                            }
+
+                            // Band designation labels
+                            Text(
+                                text = groupLabels[groupIndex],
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = theme.primaryAccent.copy(alpha = 0.8f),
+                                fontFamily = FontFamily.Monospace
+                            )
+
+                            // Representative frequency text
+                            Text(
+                                text = groupFreqs[groupIndex],
+                                fontSize = 9.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontFamily = FontFamily.Monospace
                             )
                         }
+                    }
+                }
+            } else {
+                // Scrollable 18-Band Slider Row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    DspProcessor.EQ_FREQUENCIES.forEachIndexed { index, freq ->
+                        val gainVal = if (index < currentBands.size) currentBands[index] else 0.0f
+                        
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.width(36.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = if (gainVal >= 0) "+${String.format("%.1f", gainVal)}" else String.format("%.1f", gainVal),
+                                fontSize = 9.sp,
+                                fontFamily = FontFamily.Monospace,
+                                color = theme.primaryAccent,
+                                fontWeight = FontWeight.Bold
+                            )
 
-                        Text(
-                            text = if (freq >= 1000) "${(freq / 1000).toInt()}k" else "${freq.toInt()}",
-                            fontSize = 10.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+                            // Vertical slider component
+                            Box(
+                                modifier = Modifier
+                                    .height(160.dp)
+                                    .width(31.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Slider(
+                                    value = gainVal,
+                                    onValueChange = { viewModel.updateEqBandValue(index, it) },
+                                    valueRange = -12f..12f,
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = theme.primaryAccent,
+                                        activeTrackColor = theme.primaryAccent,
+                                        inactiveTrackColor = theme.trackBackground
+                                    ),
+                                    modifier = Modifier
+                                        .graphicsLayer {
+                                            rotationZ = -90f
+                                        }
+                                        .width(160.dp)
+                                        .testTag("eq_slider_${index}")
+                                )
+                            }
+
+                            Text(
+                                text = if (freq >= 1000) "${(freq / 1000).toInt()}k" else "${freq.toInt()}",
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 }
             }

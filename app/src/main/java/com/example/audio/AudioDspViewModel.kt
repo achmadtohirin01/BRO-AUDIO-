@@ -81,6 +81,10 @@ class AudioDspViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun updateWholeEq(eqString: String) {
+        updateDbSettings { it.copy(eqSliderValues = eqString) }
+    }
+
     fun updateCrossoverPoints(subLow: Float, lowMid: Float, midHigh: Float) {
         updateDbSettings { settings ->
             settings.copy(

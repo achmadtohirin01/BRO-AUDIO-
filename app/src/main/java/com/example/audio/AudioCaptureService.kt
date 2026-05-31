@@ -113,7 +113,7 @@ class AudioCaptureService : Service() {
             start()
         }
 
-        val statusMsg = if (captureRequested) "Capturing System Audio" else "Synthesizer Beat Offline"
+        val statusMsg = if (captureRequested) "Capturing System Audio" else "Engine Online - Ready for Capture"
         audioStatusMessage.value = statusMsg
         updateNotification(statusMsg)
     }
@@ -235,8 +235,8 @@ class AudioCaptureService : Service() {
                 audioRecord?.startRecording()
                 audioStatusMessage.value = "DSP: Captured Live System Audio"
             } catch (e: Exception) {
-                Log.e(TAG, "AudioPlaybackCapture config failed. Falling back to synth beat.", e)
-                audioStatusMessage.value = "Capture Error! Playing Synth Beat"
+                Log.e(TAG, "AudioPlaybackCapture config failed. Falling back to silent line.", e)
+                audioStatusMessage.value = "Capture Error! System Silent Loop"
                 isCaptureModeActive.value = false
                 // Release problematic capture attempts
                 try { audioRecord?.release() } catch (_: Exception) {}
@@ -244,10 +244,8 @@ class AudioCaptureService : Service() {
             }
         }
 
-        // Beats generator tracking variables (for synthetic backing music)
+        // Tracking variables for statistics and updates
         var sampleIndex = 0L
-        val bpm = 125f
-        val beatIntervalSamples = (60f / bpm * sampleRate).toLong()
 
         // Continuous streaming loop
         while (isRunning.get()) {
@@ -259,67 +257,8 @@ class AudioCaptureService : Service() {
                 val readSamples = record.read(scratchBuffer, 0, bufferSizeFloats, AudioRecord.READ_BLOCKING)
                 if (readSamples <= 0) continue
             } else {
-                // Synthesizer Drum & Synth back-beat loop (generates dynamic full-range sound)
-                for (j in 0 until bufferSizeFloats step 2) {
-                    val t = sampleIndex + (j / 2)
-                    
-                    // Beat cycle metrics
-                    val beatSampleOffset = t % beatIntervalSamples
-                    val subBeatInterval = beatIntervalSamples / 4 // 16th note subdivision
-                    val subBeatOffset = t % subBeatInterval
-
-                    // 1. Kick Drum (Sub bass sweep from 150hz down to 43hz, heavy impact)
-                    val kickTrigger = (t % beatIntervalSamples) == 0L || (t % beatIntervalSamples == beatIntervalSamples / 2 && Random.nextFloat() > 0.6f)
-                    val kickAgeSec = (t % beatIntervalSamples).toFloat() / sampleRate
-                    var kick = 0f
-                    if (kickAgeSec < 0.35f) {
-                        val freqSweep = 45f + 120f * exp(-45f * kickAgeSec)
-                        val angle = 2f * PI.toFloat() * freqSweep * kickAgeSec
-                        kick = sin(angle) * exp(-8.5f * kickAgeSec) * 0.9f
-                    }
-
-                    // 2. Snare drum (Pulsing pinkish noise at off-beats)
-                    val snareAgeSec = ((t + beatIntervalSamples / 2) % beatIntervalSamples).toFloat() / sampleRate
-                    var snare = 0f
-                    if (snareAgeSec < 0.18f) {
-                        val noise = Random.nextFloat() * 2f - 1f
-                        snare = noise * exp(-15f * snareAgeSec) * 0.45f
-                    }
-
-                    // 3. Hi-Hat ticking (16th notes fast sizzles)
-                    val hatAgeSec = subBeatOffset.toFloat() / sampleRate
-                    var hat = 0f
-                    if (hatAgeSec < 0.03f) {
-                        val highPassNoise = (Random.nextFloat() * 2f - 1f) * (if (subBeatOffset % 2 == 0L) 1f else -1f)
-                        hat = highPassNoise * exp(-85f * hatAgeSec) * 0.12f
-                    }
-
-                    // 4. Synth Melodic lead arpeggiator (warm saw waves passing through chord grid)
-                    val barSamples = beatIntervalSamples * 4
-                    val chords = arrayOf(
-                        floatArrayOf(55f, 110f, 165f, 220f), // A minor chords
-                        floatArrayOf(65.4f, 130.8f, 196.2f, 261.6f), // C major
-                        floatArrayOf(58.2f, 116.5f, 174.6f, 233f), // G major
-                        floatArrayOf(48.9f, 97.9f, 146.9f, 195.9f)  // F major
-                    )
-                    val currentChordIdx = ((t / barSamples) % chords.size).toInt()
-                    val bassNotes = chords[currentChordIdx]
-                    
-                    val noteIndex = ((t / (beatIntervalSamples / 2)) % 4).toInt()
-                    val harmonicFreq = bassNotes[noteIndex]
-                    
-                    val angleSynth = 2f * PI.toFloat() * harmonicFreq * (t.toFloat() / sampleRate)
-                    // Generate square synth wave combined with saw
-                    val synthVal = (sin(angleSynth).sign * 0.4f + (angleSynth % (2f * PI.toFloat())) / PI.toFloat() - 1f) * 0.15f
-                    val synthEnvelope = exp(-1.5f * (subBeatOffset.toFloat() / sampleRate))
-                    val melody = synthVal * synthEnvelope
-
-                    val mixedMono = kick + snare + hat + melody
-                    
-                    // Interleaved L & R signal distribution
-                    scratchBuffer[j] = mixedMono
-                    scratchBuffer[j + 1] = mixedMono
-                }
+                // Fill scratchBuffer with zeros (silence) as requested - no sample/synthesized audio is generated!
+                scratchBuffer.fill(0f)
                 sampleIndex += bufferFrames
             }
 
