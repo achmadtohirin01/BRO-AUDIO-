@@ -205,6 +205,12 @@ class AudioDspViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun toggleBypass() {
+        updateDbSettings { settings ->
+            settings.copy(isBypassEnabled = !settings.isBypassEnabled)
+        }
+    }
+
     fun updateLimiterParams(attackMs: Float, releaseMs: Float, thresholdDb: Float, kneeDb: Float) {
         updateDbSettings { settings ->
             settings.copy(

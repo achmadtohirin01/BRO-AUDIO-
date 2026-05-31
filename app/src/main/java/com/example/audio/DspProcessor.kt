@@ -255,7 +255,8 @@ class DspProcessor {
         crossoverPhaseSub: Boolean = false,
         crossoverPhaseLow: Boolean = false,
         crossoverPhaseMid: Boolean = false,
-        crossoverPhaseHigh: Boolean = false
+        crossoverPhaseHigh: Boolean = false,
+        isBypassed: Boolean = false
     ) {
         var sumL = 0f
         var sumR = 0f
@@ -280,17 +281,22 @@ class DspProcessor {
             var sL = buffer[i]
             var sR = buffer[i + 1]
 
-            // Apply modules in custom order sequentially
-            for (module in routingOrder) {
-                when (module) {
-                    "EQ" -> {
-                        // Cascade of 18 filters for L and R
-                        for (band in 0 until EQ_BAND_COUNT) {
-                            sL = eqFiltersL[band].process(sL)
-                            sR = eqFiltersR[band].process(sR)
+            if (isBypassed) {
+                // Skip processing EQ, Crossover, Limiter but still scale volume
+                sL = if (isMutedL) 0f else sL * volumeL
+                sR = if (isMutedR) 0f else sR * volumeR
+            } else {
+                // Apply modules in custom order sequentially
+                for (module in routingOrder) {
+                    when (module) {
+                        "EQ" -> {
+                            // Cascade of 18 filters for L and R
+                            for (band in 0 until EQ_BAND_COUNT) {
+                                sL = eqFiltersL[band].process(sL)
+                                sR = eqFiltersR[band].process(sR)
+                            }
                         }
-                    }
-                    "CROSSOVER" -> {
+                        "CROSSOVER" -> {
                         // 4-Way Linkwitz-Riley filter routing recombines sub, low, mid, high outputs
                         // Sub signal path
                         var subL = crossSubLpL.process(crossSubHpL.process(sL))
@@ -401,6 +407,7 @@ class DspProcessor {
                     }
                 }
             }
+        }
 
             buffer[i] = sL.coerceIn(-1.0f, 1.0f)
             buffer[i + 1] = sR.coerceIn(-1.0f, 1.0f)

@@ -293,7 +293,8 @@ class AudioCaptureService : Service() {
                 crossoverPhaseSub = sets.crossoverPhaseSub,
                 crossoverPhaseLow = sets.crossoverPhaseLow,
                 crossoverPhaseMid = sets.crossoverPhaseMid,
-                crossoverPhaseHigh = sets.crossoverPhaseHigh
+                crossoverPhaseHigh = sets.crossoverPhaseHigh,
+                isBypassed = sets.isBypassEnabled
             )
 
             // Playback stream on output audiotrack

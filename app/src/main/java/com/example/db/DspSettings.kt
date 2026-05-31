@@ -57,7 +57,10 @@ data class DspSettings(
     val limiterKneeDb: Float = 3.0f,
 
     // DSP Processing Routing Chain config list
-    val dspRoutingOrder: String = "EQ,CROSSOVER,LIMITER,FADER"
+    val dspRoutingOrder: String = "EQ,CROSSOVER,LIMITER,FADER",
+    
+    // Bypass control
+    val isBypassEnabled: Boolean = false
 ) {
     // Utility functions to parse lists
     fun getEqList(): List<Float> {

@@ -42,6 +42,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -159,12 +160,12 @@ fun BroAudioControlCenter(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 4.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0C0F14)),
             shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+            border = BorderStroke(1.2.dp, Color(0xFF1B2332))
         ) {
             Column(
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier.padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Row(
@@ -174,150 +175,248 @@ fun BroAudioControlCenter(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.app_logo_fg),
-                            contentDescription = "Bro Audio Logo",
+                        // Custom logo using rounded square with colorful vertical bars
+                        Box(
                             modifier = Modifier
                                 .size(46.dp)
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFF030508))
                                 .border(
-                                    BorderStroke(1.2.dp, activeTheme.primaryAccent.copy(alpha = 0.6f)),
-                                    RoundedCornerShape(10.dp)
-                                )
-                                .background(Color.Black)
-                        )
+                                    BorderStroke(1.5.dp, Color(0xFF00FF7F)),
+                                    RoundedCornerShape(12.dp)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                verticalAlignment = Alignment.Bottom
+                            ) {
+                                Box(modifier = Modifier.weight(1f).height(12.dp).background(Color(0xFF00E5FF)))
+                                Box(modifier = Modifier.weight(1f).height(24.dp).background(Color(0xFF00FF88)))
+                                Box(modifier = Modifier.weight(1f).height(16.dp).background(Color(0xFFFF007F)))
+                            }
+                        }
 
                         Column {
-                            Text(
-                                text = "BRO AUDIO",
-                                style = TextStyle(
-                                    brush = Brush.linearGradient(
-                                        colors = listOf(activeTheme.primaryAccent, Color.White)
-                                    ),
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "BRO",
+                                    color = Color.White,
                                     fontWeight = FontWeight.Black,
-                                    fontSize = 24.sp,
-                                    letterSpacing = 1.8.sp,
-                                    fontFamily = FontFamily.SansSerif,
-                                    shadow = Shadow(
-                                        color = activeTheme.primaryAccent.copy(alpha = 0.5f),
-                                        blurRadius = 10f
-                                    )
+                                    fontSize = 22.sp,
+                                    fontFamily = FontFamily.SansSerif
                                 )
-                            )
+                                Text(
+                                    text = "EQ JOSJIS",
+                                    color = Color(0xFF00C8FF), // Beautiful bright cyan blue
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 22.sp,
+                                    fontFamily = FontFamily.SansSerif
+                                )
+                            }
                             Text(
-                                text = "SYSTEM AUDIO CAPTURE & CROSSOVER",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontSize = 8.sp,
-                                letterSpacing = 0.5.sp,
+                                text = "HYBRID DSP SYSTEM PRO",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 9.sp,
                                 fontFamily = FontFamily.Monospace,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = Color(0xFF00FF7F) // Bright green
                             )
                         }
                     }
 
-                    // Theme selector triggers inside header
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        DspThemeSelector.themes.forEach { themeOpt ->
-                            Box(
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .clip(CircleShape)
-                                    .background(themeOpt.primaryAccent)
-                                    .border(
-                                        width = if (currentThemeName == themeOpt.themeName) 2.dp else 0.dp,
-                                        color = if (currentThemeName == themeOpt.themeName) Color.White else Color.Transparent,
-                                        shape = CircleShape
-                                    )
-                                    .clickable { viewModel.setTheme(themeOpt.themeName) }
-                            )
-                        }
-                    }
-                }
-
-                // Divider line highlighting selected theme accents
-                Spacer(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(activeTheme.primaryAccent, activeTheme.secondaryAccent)
-                            )
-                        )
-                )
-
-                // Live system states and engine launcher button
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
+                    // Right column containing circular settings and ENG. ACTIVE indicator pill
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        var showThemeSelector by remember { mutableStateOf(false) }
+
+                        // Compact theme selector circles revealed when clicking settings (gear icon)
+                        if (showThemeSelector) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                DspThemeSelector.themes.forEach { themeOpt ->
+                                    Box(
+                                        modifier = Modifier
+                                            .size(16.dp)
+                                            .clip(CircleShape)
+                                            .background(themeOpt.primaryAccent)
+                                            .border(
+                                                width = if (currentThemeName == themeOpt.themeName) 1.5.dp else 0.dp,
+                                                color = if (currentThemeName == themeOpt.themeName) Color.White else Color.Transparent,
+                                                shape = CircleShape
+                                            )
+                                            .clickable { viewModel.setTheme(themeOpt.themeName) }
+                                    )
+                                }
+                            }
+                        }
+
+                        // Circular settings button
                         Box(
                             modifier = Modifier
-                                .size(10.dp)
+                                .size(36.dp)
                                 .clip(CircleShape)
-                                .background(if (isRunning) activeTheme.primaryAccent else Color.Gray)
-                        )
-                        Text(
-                            text = statusMsg,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp,
-                            color = if (isRunning) activeTheme.primaryAccent else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                                .background(Color(0xFF13222F))
+                                .clickable { showThemeSelector = !showThemeSelector },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Settings",
+                                tint = Color(0xFF00C8FF),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
 
-                    Button(
-                        onClick = {
-                            if (!isRunning) {
-                                // Request dynamic recording permission is API level >= 29
-                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-                                    permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                                } else {
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && mpManager != null) {
-                                        try {
-                                            captureLauncher.launch(mpManager.createScreenCaptureIntent())
-                                        } catch (e: Exception) {
-                                            viewModel.toggleAudioPlayback(context)
+                        // ENG. ACTIVE switch pill indicator under a single sleek handle
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(if (isRunning) Color(0xFF0F2B2B) else Color(0xFF1D1F24))
+                                .clickable {
+                                    if (!isRunning) {
+                                        // Request recording permission if needed
+                                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                                            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                        } else {
+                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && mpManager != null) {
+                                                try {
+                                                    captureLauncher.launch(mpManager.createScreenCaptureIntent())
+                                                } catch (e: Exception) {
+                                                    viewModel.toggleAudioPlayback(context)
+                                                }
+                                            } else {
+                                                viewModel.toggleAudioPlayback(context)
+                                            }
                                         }
                                     } else {
                                         viewModel.toggleAudioPlayback(context)
                                     }
                                 }
-                            } else {
-                                viewModel.toggleAudioPlayback(context)
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isRunning) Color(0xFF00FF7F) else Color.Gray)
+                                )
+                                Text(
+                                    text = if (isRunning) "ENG. ACTIVE" else "ENG. INACTIVE",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Black,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = if (isRunning) Color(0xFF00FF88) else Color.LightGray
+                                )
                             }
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isRunning) Color(0xFFC33D3D) else activeTheme.primaryAccent,
-                            contentColor = Color.Black
-                        ),
-                        modifier = Modifier.testTag("engine_toggle_btn"),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- SISTEM AUDIO BYPASS CARD ---
+        val isBypassEnabled = dspSettings.isBypassEnabled
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0C0F14)),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.2.dp, Color(0xFF1B2332))
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Icon(
-                            imageVector = if (isRunning) Icons.Default.PowerSettingsNew else Icons.Default.PlayArrow,
-                            contentDescription = "Power Trigger",
-                            modifier = Modifier.size(16.dp)
+                            imageVector = Icons.Default.SettingsInputHdmi,
+                            contentDescription = "Bypass Icon",
+                            tint = Color(0xFF00C8FF),
+                            modifier = Modifier.size(22.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = if (isRunning) "OFFLINE" else "ONLINE",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
-                            fontFamily = FontFamily.Monospace
+                            text = "SISTEM AUDIO BYPASS",
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 13.sp,
+                            fontFamily = FontFamily.Monospace,
+                            color = Color.White
                         )
                     }
+
+                    // ● AKTIF / NON-AKTIF Toggle Pill
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(if (isBypassEnabled) Color(0xFF00FF7F) else Color(0xFF232B3A))
+                            .clickable { viewModel.toggleBypass() }
+                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isBypassEnabled) Color.Black else Color.Gray)
+                            )
+                            Text(
+                                text = if (isBypassEnabled) "AKTIF" else "NON-AKTIF",
+                                fontWeight = FontWeight.Black,
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace,
+                                color = if (isBypassEnabled) Color.Black else Color.LightGray
+                            )
+                        }
+                    }
+                }
+
+                // Central spaced typography text inside card:
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "A P L I K A S I N E   C A H   N D E S O",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White.copy(alpha = 0.85f),
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 1.2.sp
+                    )
+                    Text(
+                        text = "A S L I   W O N G   B A N J A R N E G A R A",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White.copy(alpha = 0.85f),
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 1.2.sp
+                    )
                 }
             }
         }
@@ -325,9 +424,9 @@ fun BroAudioControlCenter(
         // --- Real-time Visualizer Panel: VU meters and Canvas spectrum ---
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0C0F14)),
             shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+            border = BorderStroke(1.2.dp, Color(0xFF1B2332))
         ) {
             Column(
                 modifier = Modifier.padding(14.dp),
@@ -340,9 +439,10 @@ fun BroAudioControlCenter(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "REAL-TIME SPECTRUM & VU MONITOR (<15ms Latency)",
+                        text = "SPECTRUM ANALYZER & MASTER VU METER L/R",
                         style = MaterialTheme.typography.labelSmall,
-                        color = activeTheme.primaryAccent,
+                        color = Color.LightGray,
+                        fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace,
                         modifier = Modifier.padding(bottom = 2.dp)
                     )
@@ -357,7 +457,7 @@ fun BroAudioControlCenter(
                             style = MaterialTheme.typography.labelSmall,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (isInputGateOn) activeTheme.primaryAccent else Color.Gray,
+                            color = if (isInputGateOn) Color(0xFF00FF7F) else Color.Gray,
                             fontFamily = FontFamily.Monospace
                         )
                         Switch(
@@ -365,7 +465,7 @@ fun BroAudioControlCenter(
                             onCheckedChange = { viewModel.setInputEnabled(it) },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = Color.Black,
-                                checkedTrackColor = activeTheme.primaryAccent,
+                                checkedTrackColor = Color(0xFF00FF7F),
                                 uncheckedThumbColor = Color.Gray,
                                 uncheckedTrackColor = Color(0xFF1E2129)
                             ),
@@ -374,123 +474,274 @@ fun BroAudioControlCenter(
                     }
                 }
 
-                // Stereo VU Meter Bars
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                            Text("CH L", fontSize = 9.sp, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("${String.format("%.1f", 20f * log10(liveVUL.coerceAtLeast(0.0001f)))} dB", fontSize = 9.sp, fontFamily = FontFamily.Monospace, color = activeTheme.primaryAccent)
-                        }
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(10.dp)
-                                .clip(RoundedCornerShape(3.dp))
-                                .background(activeTheme.trackBackground)
-                        ) {
-                            // VU Level
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .fillMaxWidth(fraction = liveVUL.coerceIn(0f, 1f))
-                                    .background(
-                                        Brush.linearGradient(
-                                            colors = listOf(activeTheme.primaryAccent, activeTheme.secondaryAccent)
-                                        )
-                                    )
-                            )
-                            // Peak dot
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .width(3.dp)
-                                    .align(Alignment.CenterStart)
-                                    .absoluteOffset(x = (livePeakL * 240).dp) // visual approximation mapping
-                                    .background(Color.White)
-                            )
-                        }
-                    }
-
-                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                            Text("CH R", fontSize = 9.sp, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("${String.format("%.1f", 20f * log10(liveVUR.coerceAtLeast(0.0001f)))} dB", fontSize = 9.sp, fontFamily = FontFamily.Monospace, color = activeTheme.primaryAccent)
-                        }
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(10.dp)
-                                .clip(RoundedCornerShape(3.dp))
-                                .background(activeTheme.trackBackground)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .fillMaxWidth(fraction = liveVUR.coerceIn(0f, 1f))
-                                    .background(
-                                        Brush.linearGradient(
-                                            colors = listOf(activeTheme.primaryAccent, activeTheme.secondaryAccent)
-                                        )
-                                    )
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .width(3.dp)
-                                    .align(Alignment.CenterStart)
-                                    .absoluteOffset(x = (livePeakR * 240).dp)
-                                    .background(Color.White)
-                            )
-                        }
-                    }
-                }
-
-                // Dynamic Canvas FFT Spectrum visualizer
-                Canvas(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(85.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF07080A))
-                        .border(1.dp, Color(0xFF1E2129), RoundedCornerShape(8.dp))
+                        .height(230.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    val canvasWidth = size.width
-                    val canvasHeight = size.height
-                    
-                    val barSpacing = 4f
-                    val barCount = 32
-                    val itemWidth = (canvasWidth - (barSpacing * (barCount - 1))) / barCount
+                    // LEFT: Spectrum Analyzer (60% weight)
+                    Box(
+                        modifier = Modifier
+                            .weight(1.5f)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFF040609))
+                            .border(1.dp, Color(0xFF1E2129), RoundedCornerShape(12.dp))
+                            .padding(8.dp)
+                    ) {
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val canvasWidth = size.width
+                            val canvasHeight = size.height
+                            
+                            val barSpacing = 4f
+                            val barCount = 18
+                            val itemWidth = (canvasWidth - (barSpacing * (barCount - 1))) / barCount
 
-                    // Draw center timeline grid
-                    drawLine(
-                        color = Color(0xFF1B1E26),
-                        start = Offset(0f, canvasHeight / 2f),
-                        end = Offset(canvasWidth, canvasHeight / 2f),
-                        strokeWidth = 1f
-                    )
+                            // Draw horizontal timeline grid lines
+                            for (gridIdx in 1..4) {
+                                val gridY = canvasHeight * (gridIdx / 5f)
+                                drawLine(
+                                    color = Color(0xFF12141A),
+                                    start = Offset(0f, gridY),
+                                    end = Offset(canvasWidth, gridY),
+                                    strokeWidth = 1f
+                                )
+                            }
 
-                    // Wave form bar loops
-                    for (index in 0 until barCount) {
-                        val mag = if (index < liveSpec.size) liveSpec[index] else 0.05f
-                        val scaledMagnitude = (mag * canvasHeight * 0.9f).coerceIn(4f, canvasHeight * 0.95f)
-                        val x = index * (itemWidth + barSpacing)
-                        
-                        // Mirrored spectrum bars from vertical center
-                        val y = (canvasHeight - scaledMagnitude) / 2f
+                            // Draw Spectrum bars
+                            for (index in 0 until barCount) {
+                                val mag = if (index < liveSpec.size) liveSpec[index] else 0.05f
+                                val scaledMagnitude = (mag * canvasHeight * 0.95f).coerceIn(6f, canvasHeight * 0.98f)
+                                val x = index * (itemWidth + barSpacing)
+                                val y = canvasHeight - scaledMagnitude
 
-                        drawRoundRect(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(activeTheme.primaryAccent, activeTheme.secondaryAccent)
-                            ),
-                            topLeft = Offset(x, y),
-                            size = Size(itemWidth, scaledMagnitude),
-                            cornerRadius = CornerRadius(2f, 2f),
-                            alpha = 0.85f
-                        )
+                                drawRoundRect(
+                                    brush = Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color(0xFFFF007F), // Pink/Magenta top
+                                            Color(0xFF9E00FF), // Violet Mid-top
+                                            Color(0xFF00E5FF), // Cyan mid-bottom
+                                            Color(0xFF034D41)  // Dark Blue/Teal bottom
+                                        )
+                                    ),
+                                    topLeft = Offset(x, y),
+                                    size = Size(itemWidth, scaledMagnitude),
+                                    cornerRadius = CornerRadius(1.5f, 1.5f),
+                                    alpha = 0.85f
+                                )
+                            }
+
+                            // Overlaid Neon Cyan Bezier peak curve matching the original image's triangle spike look
+                            val neonPath = Path()
+                            val controlPoints = ArrayList<Offset>()
+                            
+                            for (index in 0 until barCount) {
+                                val mag = if (index < liveSpec.size) liveSpec[index] else 0.05f
+                                val x = index * (itemWidth + barSpacing) + (itemWidth / 2f)
+                                val y = canvasHeight - (mag * canvasHeight * 0.65f + (canvasHeight * 0.25f))
+                                controlPoints.add(Offset(x, y.coerceIn(10f, canvasHeight - 10f)))
+                            }
+
+                            if (controlPoints.isNotEmpty()) {
+                                neonPath.moveTo(0f, canvasHeight * 0.7f)
+                                for (i in 0 until controlPoints.size - 1) {
+                                    val p1 = controlPoints[i]
+                                    val p2 = controlPoints[i + 1]
+                                    val xc = (p1.x + p2.x) / 2f
+                                    val yc = (p1.y + p2.y) / 2f
+                                    neonPath.quadraticTo(p1.x, p1.y, xc, yc)
+                                }
+                                neonPath.lineTo(canvasWidth, canvasHeight * 0.7f)
+                                
+                                drawPath(
+                                    path = neonPath,
+                                    color = Color(0x2200FFFF),
+                                    style = Stroke(width = 8f)
+                                )
+                                drawPath(
+                                    path = neonPath,
+                                    color = Color(0xFF00E5FF),
+                                    style = Stroke(width = 3.5f)
+                                )
+                            }
+                        }
+                    }
+
+                    // RIGHT: Master VU Meter L/R (40% weight)
+                    Box(
+                        modifier = Modifier
+                            .weight(1.0f)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFF040609))
+                            .border(1.dp, Color(0xFF1E2129), RoundedCornerShape(12.dp))
+                            .padding(8.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.SpaceBetween,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "PRO MASTER VU",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White.copy(alpha = 0.6f),
+                                fontFamily = FontFamily.Monospace
+                            )
+
+                            // Segmented led meter bars
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                // CH L
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(1.5.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    val segmentsCount = 12
+                                    for (segIdx in 0 until segmentsCount) {
+                                        val segmentThreshold = (segmentsCount - segIdx).toFloat() / segmentsCount
+                                        val isActive = liveVUL >= segmentThreshold
+                                        
+                                        val col = when {
+                                            segIdx < 3 -> if (isActive) Color(0xFFFF3333) else Color(0x22FF3333)
+                                            segIdx < 6 -> if (isActive) Color(0xFFFFB233) else Color(0x22FFB233)
+                                            else -> if (isActive) Color(0xFF00FF88) else Color(0x2200FF88)
+                                        }
+
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth(0.85f)
+                                                .height(5.dp)
+                                                .clip(RoundedCornerShape(1.dp))
+                                                .background(col)
+                                        )
+                                    }
+                                }
+
+                                // DB labels in the middle
+                                Column(
+                                    modifier = Modifier.weight(0.8f).fillMaxHeight(),
+                                    verticalArrangement = Arrangement.SpaceBetween,
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text("+6", fontSize = 8.sp, color = Color(0xFFFF3333), fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                                    Text("+3", fontSize = 8.sp, color = Color(0xFFFFB233), fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                                    Text("0 dB", fontSize = 8.sp, color = Color(0xFF00FF88), fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                                }
+
+                                // CH R
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(1.5.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    val segmentsCount = 12
+                                    for (segIdx in 0 until segmentsCount) {
+                                        val segmentThreshold = (segmentsCount - segIdx).toFloat() / segmentsCount
+                                        val isActive = liveVUR >= segmentThreshold
+                                        
+                                        val col = when {
+                                            segIdx < 3 -> if (isActive) Color(0xFFFF3333) else Color(0x22FF3333)
+                                            segIdx < 6 -> if (isActive) Color(0xFFFFB233) else Color(0x22FFB233)
+                                            else -> if (isActive) Color(0xFF00FF88) else Color(0x2200FF88)
+                                        }
+
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth(0.85f)
+                                                .height(5.dp)
+                                                .clip(RoundedCornerShape(1.dp))
+                                                .background(col)
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Peak CLP leds
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceAround,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                val isClipL = livePeakL >= 0.95f
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isClipL) Color.Red else Color(0xFF440000))
+                                )
+
+                                Text(
+                                    text = "CLIP",
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Gray,
+                                    fontFamily = FontFamily.Monospace
+                                )
+
+                                val isClipR = livePeakR >= 0.95f
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isClipR) Color.Red else Color(0xFF440000))
+                                )
+                            }
+
+                            // L 100% and R 100% labels
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("L 100%", fontSize = 8.sp, color = Color(0xFFFF6688), fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                                Text("R 100%", fontSize = 8.sp, color = Color(0xFFFF6688), fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                            }
+
+                            Spacer(modifier = Modifier.height(2.dp))
+
+                            // Horizontal capsules under L and R, representing fader master volume
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(10.dp)
+                                        .clip(RoundedCornerShape(5.dp))
+                                        .background(Color(0xFF122C24))
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxHeight()
+                                            .fillMaxWidth(fraction = dspSettings.masterVolumeL.coerceIn(0f, 1.5f) / 1.5f)
+                                            .background(Color(0xFF00FF88))
+                                    )
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(10.dp)
+                                        .clip(RoundedCornerShape(5.dp))
+                                        .background(Color(0xFF122C24))
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxHeight()
+                                            .fillMaxWidth(fraction = dspSettings.masterVolumeR.coerceIn(0f, 1.5f) / 1.5f)
+                                            .background(Color(0xFF00FF88))
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -503,7 +754,7 @@ fun BroAudioControlCenter(
                         Icon(
                             imageVector = Icons.Default.Compress,
                             contentDescription = "Limiter Status",
-                            tint = activeTheme.primaryAccent,
+                            tint = Color(0xFF00FF7F),
                             modifier = Modifier.size(12.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
@@ -512,7 +763,7 @@ fun BroAudioControlCenter(
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
-                            color = activeTheme.primaryAccent
+                            color = Color(0xFF00FF7F)
                         )
                     }
                 }
@@ -577,6 +828,8 @@ fun LaserVerticalSlider(
     range: ClosedFloatingPointRange<Float> = -12f..12f,
     activeTheme: com.example.ui.theme.DspTheme
 ) {
+    var localValue by remember(value) { mutableStateOf(value) }
+    
     BoxWithConstraints(
         modifier = modifier
             .width(36.dp)
@@ -584,29 +837,33 @@ fun LaserVerticalSlider(
         contentAlignment = Alignment.Center
     ) {
         val sliderHeight = constraints.maxHeight.toFloat()
-        val currentFraction = ((value - range.start) / (range.endInclusive - range.start)).coerceIn(0f, 1f)
+        val currentFraction = ((localValue - range.start) / (range.endInclusive - range.start)).coerceIn(0f, 1f)
         
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(value) {
+                .pointerInput(Unit) {
                     detectTapGestures(
                         onPress = { offset ->
                             val y = offset.y.coerceIn(0f, sliderHeight)
                             val fraction = 1f - (y / sliderHeight)
                             val newVal = range.start + fraction * (range.endInclusive - range.start)
-                            onValueChange(newVal.coerceIn(range.start, range.endInclusive))
+                            val clamped = newVal.coerceIn(range.start, range.endInclusive)
+                            localValue = clamped
+                            onValueChange(clamped)
                         }
                     )
                 }
-                .pointerInput(value) {
+                .pointerInput(Unit) {
                     detectDragGestures { change, dragAmount ->
                         change.consume()
-                        val currentY = (1f - ((value - range.start) / (range.endInclusive - range.start))) * sliderHeight
+                        val currentY = (1f - ((localValue - range.start) / (range.endInclusive - range.start))) * sliderHeight
                         val targetY = (currentY + dragAmount.y).coerceIn(0f, sliderHeight)
                         val fraction = 1f - (targetY / sliderHeight)
                         val newVal = range.start + fraction * (range.endInclusive - range.start)
-                        onValueChange(newVal.coerceIn(range.start, range.endInclusive))
+                        val clamped = newVal.coerceIn(range.start, range.endInclusive)
+                        localValue = clamped
+                        onValueChange(clamped)
                     }
                 }
         ) {
@@ -736,9 +993,9 @@ fun EqualizerPanel(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF0C0F14)),
         shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        border = BorderStroke(1.2.dp, Color(0xFF1B2332))
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
@@ -1009,6 +1266,8 @@ fun LaserVerticalFader(
     color: Color,
     modifier: Modifier = Modifier
 ) {
+    var localValue by remember(value) { mutableStateOf(value) }
+    
     BoxWithConstraints(
         modifier = modifier
             .width(28.dp)
@@ -1016,29 +1275,33 @@ fun LaserVerticalFader(
         contentAlignment = Alignment.Center
     ) {
         val sliderHeight = constraints.maxHeight.toFloat()
-        val currentFraction = ((value - (-12f)) / 24f).coerceIn(0f, 1f)
+        val currentFraction = ((localValue - (-12f)) / 24f).coerceIn(0f, 1f)
         
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(value) {
+                .pointerInput(Unit) {
                     detectTapGestures(
                         onPress = { offset ->
                             val y = offset.y.coerceIn(0f, sliderHeight)
                             val fraction = 1f - (y / sliderHeight)
                             val newVal = -12f + fraction * 24f
-                            onValueChange(newVal.coerceIn(-12f, 12f))
+                            val clamped = newVal.coerceIn(-12f, 12f)
+                            localValue = clamped
+                            onValueChange(clamped)
                         }
                     )
                 }
-                .pointerInput(value) {
+                .pointerInput(Unit) {
                     detectDragGestures { change, dragAmount ->
                         change.consume()
-                        val currentY = (1f - ((value - (-12f)) / 24f)) * sliderHeight
+                        val currentY = (1f - ((localValue - (-12f)) / 24f)) * sliderHeight
                         val targetY = (currentY + dragAmount.y).coerceIn(0f, sliderHeight)
                         val fraction = 1f - (targetY / sliderHeight)
                         val newVal = -12f + fraction * 24f
-                        onValueChange(newVal.coerceIn(-12f, 12f))
+                        val clamped = newVal.coerceIn(-12f, 12f)
+                        localValue = clamped
+                        onValueChange(clamped)
                     }
                 }
         ) {
@@ -1092,7 +1355,7 @@ fun LaserVerticalFader(
 }
 
 /**
- * 4-Way Audio Crossover panel matching physical stage crossovers (Image 2).
+ * 4-Way Audio Crossover panel matching physical stage crossovers configured horizontally for phone screens.
  */
 @Composable
 fun CrossoverPanel(
@@ -1114,15 +1377,11 @@ fun CrossoverPanel(
         else 1f + (db / 12f) * 0.5f
     }
 
-    // Collect real-time VU signals to drive the 4 LED channels dynamically
-    val liveVU_L by viewModel.liveVUMeterL.collectAsState()
-    val liveVU_R by viewModel.liveVUMeterR.collectAsState()
-
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF0C0F14)),
         shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        border = BorderStroke(1.2.dp, Color(0xFF1B2332))
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
@@ -1207,97 +1466,85 @@ fun CrossoverPanel(
                 }
             }
 
-            // Side-by-Side 4 Channel Mixing Strip layout
-            Row(
+            // Modern, Spacious 4 Channel Mixing horizontal rack layout for perfect phone viewport scaling
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.Top
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Channel 1: SUB
                 val subDb = multiplierToDb(settings.crossoverVolSub)
-                CrossoverChannelStrip(
-                    title = "SUB 🔊",
+                CrossoverChannelStripHorizontal(
+                    title = "SUB",
                     freqLabel = "40-120Hz",
                     dbValue = subDb,
                     multiplier = settings.crossoverVolSub,
                     isMute = settings.crossoverMuteSub,
                     isSolo = settings.crossoverSoloSub,
                     isPhase = settings.crossoverPhaseSub,
-                    levelFraction = (liveVU_L * 1.35f + (Math.random() * 0.05).toFloat()).coerceIn(0f, 1f),
                     accentColor = Color(0xFFFF5252), // Neon Red
                     onValueChange = { viewModel.updateCrossoverChannelVol("SUB", dbToMultiplier(it)) },
                     onMuteToggle = { viewModel.toggleCrossoverMute("SUB") },
                     onSoloToggle = { viewModel.toggleCrossoverSolo("SUB") },
-                    onPhaseToggle = { viewModel.toggleCrossoverPhase("SUB") },
-                    modifier = Modifier.weight(1f)
+                    onPhaseToggle = { viewModel.toggleCrossoverPhase("SUB") }
                 )
 
                 // Channel 2: LOW
                 val lowDb = multiplierToDb(settings.crossoverVolLow)
-                CrossoverChannelStrip(
-                    title = "LOW 🎸",
+                CrossoverChannelStripHorizontal(
+                    title = "LOW",
                     freqLabel = "120-700Hz",
                     dbValue = lowDb,
                     multiplier = settings.crossoverVolLow,
                     isMute = settings.crossoverMuteLow,
                     isSolo = settings.crossoverSoloLow,
                     isPhase = settings.crossoverPhaseLow,
-                    levelFraction = (liveVU_R * 1.15f + (Math.random() * 0.05).toFloat()).coerceIn(0f, 1f),
                     accentColor = Color(0xFFFFC107), // Neon Yellow/Orange
                     onValueChange = { viewModel.updateCrossoverChannelVol("LOW", dbToMultiplier(it)) },
                     onMuteToggle = { viewModel.toggleCrossoverMute("LOW") },
                     onSoloToggle = { viewModel.toggleCrossoverSolo("LOW") },
-                    onPhaseToggle = { viewModel.toggleCrossoverPhase("LOW") },
-                    modifier = Modifier.weight(1f)
+                    onPhaseToggle = { viewModel.toggleCrossoverPhase("LOW") }
                 )
 
                 // Channel 3: MID
                 val midDb = multiplierToDb(settings.crossoverVolMid)
-                CrossoverChannelStrip(
-                    title = "MID 🎤",
+                CrossoverChannelStripHorizontal(
+                    title = "MID",
                     freqLabel = "700-6kHz",
                     dbValue = midDb,
                     multiplier = settings.crossoverVolMid,
                     isMute = settings.crossoverMuteMid,
                     isSolo = settings.crossoverSoloMid,
                     isPhase = settings.crossoverPhaseMid,
-                    levelFraction = (liveVU_L * 1.25f + (Math.random() * 0.05).toFloat()).coerceIn(0f, 1f),
                     accentColor = Color(0xFF69F0AE), // Neon Green
                     onValueChange = { viewModel.updateCrossoverChannelVol("MID", dbToMultiplier(it)) },
                     onMuteToggle = { viewModel.toggleCrossoverMute("MID") },
                     onSoloToggle = { viewModel.toggleCrossoverSolo("MID") },
-                    onPhaseToggle = { viewModel.toggleCrossoverPhase("MID") },
-                    modifier = Modifier.weight(1f)
+                    onPhaseToggle = { viewModel.toggleCrossoverPhase("MID") }
                 )
 
                 // Channel 4: HIGH
                 val highDb = multiplierToDb(settings.crossoverVolHigh)
-                CrossoverChannelStrip(
-                    title = "HIGH 🔔",
+                CrossoverChannelStripHorizontal(
+                    title = "HIGH",
                     freqLabel = "6k-20kHz",
                     dbValue = highDb,
                     multiplier = settings.crossoverVolHigh,
                     isMute = settings.crossoverMuteHigh,
                     isSolo = settings.crossoverSoloHigh,
                     isPhase = settings.crossoverPhaseHigh,
-                    levelFraction = (liveVU_R * 1.4f + (Math.random() * 0.05).toFloat()).coerceIn(0f, 1f),
                     accentColor = Color(0xFF40C4FF), // Neon Cyan/Blue
                     onValueChange = { viewModel.updateCrossoverChannelVol("HIGH", dbToMultiplier(it)) },
                     onMuteToggle = { viewModel.toggleCrossoverMute("HIGH") },
                     onSoloToggle = { viewModel.toggleCrossoverSolo("HIGH") },
-                    onPhaseToggle = { viewModel.toggleCrossoverPhase("HIGH") },
-                    modifier = Modifier.weight(1f)
+                    onPhaseToggle = { viewModel.toggleCrossoverPhase("HIGH") }
                 )
             }
         }
     }
 }
 
-/**
- * Single Channel Mixing strip layout containing vertical VU meters, faders, and control keys
- */
 @Composable
-fun CrossoverChannelStrip(
+fun CrossoverChannelStripHorizontal(
     title: String,
     freqLabel: String,
     dbValue: Float,
@@ -1305,7 +1552,6 @@ fun CrossoverChannelStrip(
     isMute: Boolean,
     isSolo: Boolean,
     isPhase: Boolean,
-    levelFraction: Float,
     accentColor: Color,
     onValueChange: (Float) -> Unit,
     onMuteToggle: () -> Unit,
@@ -1313,124 +1559,148 @@ fun CrossoverChannelStrip(
     onPhaseToggle: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
+    Row(
         modifier = modifier
-            .background(Color(0xFF0F1116), RoundedCornerShape(8.dp))
-            .border(1.dp, Color(0xFF1E2129), RoundedCornerShape(8.dp))
-            .padding(vertical = 8.dp, horizontal = 3.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+            .fillMaxWidth()
+            .background(Color(0xFF0F1116), RoundedCornerShape(10.dp))
+            .border(1.dp, Color(0xFF1E2129), RoundedCornerShape(10.dp))
+            .padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text(
-            text = title,
-            fontSize = 9.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = accentColor,
-            fontFamily = FontFamily.Monospace,
-            textAlign = TextAlign.Center
-        )
-        Text(
-            text = freqLabel,
-            fontSize = 7.sp,
-            color = Color.Gray,
-            fontFamily = FontFamily.Monospace,
-            textAlign = TextAlign.Center
-        )
-
-        // Twin block: Level LED panel next to Capsule slider
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier.padding(horizontal = 2.dp)
+        // LEFT: Title & Freq tag
+        Column(
+            modifier = Modifier.width(64.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.Start
         ) {
-            // High Resolution LED segment Peak Multimeter
-            LedLevelMeter(levelFraction = if (isMute) 0f else levelFraction)
-
-            // Professional console slot volume fader
-            LaserVerticalFader(
-                value = dbValue,
-                onValueChange = onValueChange,
-                color = accentColor
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(accentColor.copy(alpha = 0.15f))
+                    .padding(horizontal = 6.dp, vertical = 3.dp)
+            ) {
+                Text(
+                    text = title,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = accentColor,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = freqLabel,
+                fontSize = 8.sp,
+                color = Color.Gray,
+                fontFamily = FontFamily.Monospace
             )
         }
 
-        // Channel Level Volume status percentages
-        Text(
-            text = if (isMute) "MUTE" else "${(multiplier * 100).toInt()}%",
-            fontSize = 8.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace,
-            color = if (isMute) Color.Red else Color.White
-        )
-
-        // Real-time dB numeric readout
-        Text(
-            text = if (isMute) "SILENT" else if (dbValue <= -11.8f) "CUT" else "${String.format(java.util.Locale.US, "%+.1f", dbValue)} dB",
-            fontSize = 8.sp,
-            fontWeight = FontWeight.Medium,
-            fontFamily = FontFamily.Monospace,
-            color = if (isMute) Color.Gray else accentColor
-        )
-
-        // Block containing Triple physical square key caps: M (Mute), S (Solo), Phase (Ø)
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
-            verticalAlignment = Alignment.CenterVertically
+        // CENTER: Smooth Horizontal Slider
+        Box(
+            modifier = Modifier.weight(1f),
+            contentAlignment = Alignment.Center
         ) {
-            // M (Mute) Button
-            Box(
-                modifier = Modifier
-                    .size(18.dp)
-                    .clip(RoundedCornerShape(3.dp))
-                    .background(if (isMute) Color.Red else Color(0xFF1D2027))
-                    .border(0.5.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(3.dp))
-                    .clickable { onMuteToggle() },
-                contentAlignment = Alignment.Center
+            Slider(
+                value = dbValue,
+                onValueChange = onValueChange,
+                valueRange = -12f..12f,
+                colors = SliderDefaults.colors(
+                    thumbColor = accentColor,
+                    activeTrackColor = accentColor,
+                    inactiveTrackColor = Color(0xFF222631)
+                ),
+                modifier = Modifier.height(24.dp)
+            )
+        }
+
+        // RIGHT: Control indicators & Status Readout
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            // M, S, Phase Control buttons
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "M",
-                    fontSize = 8.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = if (isMute) Color.White else Color.Gray,
-                    fontFamily = FontFamily.Monospace
-                )
+                // M (Mute) Button
+                Box(
+                    modifier = Modifier
+                        .size(22.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(if (isMute) Color.Red else Color(0xFF1D2027))
+                        .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(4.dp))
+                        .clickable { onMuteToggle() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "M",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isMute) Color.White else Color.Gray,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+
+                // S (Solo) Button
+                Box(
+                    modifier = Modifier
+                        .size(22.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(if (isSolo) Color(0xFFFF9800) else Color(0xFF1D2027))
+                        .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(4.dp))
+                        .clickable { onSoloToggle() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "S",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isSolo) Color.White else Color.Gray,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+
+                // Ø (Phase) Button
+                Box(
+                    modifier = Modifier
+                        .size(22.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(if (isPhase) Color(0xFF00FF7F) else Color(0xFF1D2027))
+                        .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(4.dp))
+                        .clickable { onPhaseToggle() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Ø",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isPhase) Color.White else Color.Gray,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
             }
 
-            // S (Solo) Button
-            Box(
-                modifier = Modifier
-                    .size(18.dp)
-                    .clip(RoundedCornerShape(3.dp))
-                    .background(if (isSolo) Color(0xFFFF9800) else Color(0xFF1D2027))
-                    .border(0.5.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(3.dp))
-                    .clickable { onSoloToggle() },
-                contentAlignment = Alignment.Center
+            // Value Display
+            Column(
+                modifier = Modifier.width(48.dp),
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.Center
             ) {
                 Text(
-                    text = "S",
-                    fontSize = 8.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = if (isSolo) Color.White else Color.Gray,
-                    fontFamily = FontFamily.Monospace
+                    text = if (isMute) "MUTE" else "${(multiplier * 100).toInt()}%",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    color = if (isMute) Color.Red else Color.White
                 )
-            }
-
-            // Phase Ø Invert Button
-            Box(
-                modifier = Modifier
-                    .size(18.dp)
-                    .clip(RoundedCornerShape(3.dp))
-                    .background(if (isPhase) Color(0xFF9C27B0) else Color(0xFF1D2027))
-                    .border(0.5.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(3.dp))
-                    .clickable { onPhaseToggle() },
-                contentAlignment = Alignment.Center
-            ) {
                 Text(
-                    text = "Ø",
+                    text = if (isMute) "SILENT" else if (dbValue <= -11.8f) "CUT" else "${String.format(java.util.Locale.US, "%+.1f", dbValue)} dB",
                     fontSize = 8.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = if (isPhase) Color.White else Color.Gray,
-                    fontFamily = FontFamily.Monospace
+                    fontFamily = FontFamily.Monospace,
+                    color = if (isMute) Color.Gray else accentColor
                 )
             }
         }
@@ -1448,9 +1718,9 @@ fun CompressorPanel(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF0C0F14)),
         shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        border = BorderStroke(1.2.dp, Color(0xFF1B2332))
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
@@ -1553,9 +1823,9 @@ fun SpatialFxPanel(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF0C0F14)),
         shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        border = BorderStroke(1.2.dp, Color(0xFF1B2332))
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
@@ -1625,9 +1895,9 @@ fun LimiterPanel(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF0C0F14)),
         shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        border = BorderStroke(1.2.dp, Color(0xFF1B2332))
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
