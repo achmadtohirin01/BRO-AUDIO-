@@ -1,0 +1,6 @@
+{
+  "name": "BRO AUDIO",
+  "description": "Professional Android Native Audio DSP: Real-time 18-Band EQ, 4-Way Crossover, Dual Master Fader, and Peak Limiter with Global Audio Capture.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
