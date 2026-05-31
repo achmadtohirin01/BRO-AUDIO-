@@ -35,6 +35,7 @@ class AudioDspViewModel(application: Application) : AndroidViewModel(application
     val liveSpectrum: StateFlow<FloatArray> = AudioCaptureService.liveSpectrum
     val isEngineRunning: StateFlow<Boolean> = AudioCaptureService.isEngineRunning
     val isCaptureModeActive: StateFlow<Boolean> = AudioCaptureService.isCaptureModeActive
+    val isInputEnabled: StateFlow<Boolean> = AudioCaptureService.isInputEnabled
     val audioStatusMessage: StateFlow<String> = AudioCaptureService.audioStatusMessage
 
     init {
@@ -92,6 +93,96 @@ class AudioDspViewModel(application: Application) : AndroidViewModel(application
                 crossoverLowMidHz = lowMid.coerceIn(subLow + 20f, 1000f),
                 crossoverMidHighHz = midHigh.coerceIn(lowMid + 200f, 12000f)
             )
+        }
+    }
+
+    fun updateCrossoverChannelVol(channel: String, volume: Float) {
+        updateDbSettings { settings ->
+            when (channel) {
+                "SUB" -> settings.copy(crossoverVolSub = volume.coerceIn(0f, 1.5f))
+                "LOW" -> settings.copy(crossoverVolLow = volume.coerceIn(0f, 1.5f))
+                "MID" -> settings.copy(crossoverVolMid = volume.coerceIn(0f, 1.5f))
+                "HIGH" -> settings.copy(crossoverVolHigh = volume.coerceIn(0f, 1.5f))
+                else -> settings
+            }
+        }
+    }
+
+    fun toggleCrossoverMute(channel: String) {
+        updateDbSettings { settings ->
+            when (channel) {
+                "SUB" -> settings.copy(crossoverMuteSub = !settings.crossoverMuteSub)
+                "LOW" -> settings.copy(crossoverMuteLow = !settings.crossoverMuteLow)
+                "MID" -> settings.copy(crossoverMuteMid = !settings.crossoverMuteMid)
+                "HIGH" -> settings.copy(crossoverMuteHigh = !settings.crossoverMuteHigh)
+                else -> settings
+            }
+        }
+    }
+
+    fun toggleCrossoverSolo(channel: String) {
+        updateDbSettings { settings ->
+            when (channel) {
+                "SUB" -> {
+                    val s = !settings.crossoverSoloSub
+                    if (s) {
+                        // Solo is activated: mute low, mid, high
+                        settings.copy(
+                            crossoverSoloSub = true, crossoverSoloLow = false, crossoverSoloMid = false, crossoverSoloHigh = false,
+                            crossoverMuteSub = false, crossoverMuteLow = true, crossoverMuteMid = true, crossoverMuteHigh = true
+                        )
+                    } else {
+                        // Solo deactivated
+                        settings.copy(crossoverSoloSub = false)
+                    }
+                }
+                "LOW" -> {
+                    val s = !settings.crossoverSoloLow
+                    if (s) {
+                        settings.copy(
+                            crossoverSoloSub = false, crossoverSoloLow = true, crossoverSoloMid = false, crossoverSoloHigh = false,
+                            crossoverMuteSub = true, crossoverMuteLow = false, crossoverMuteMid = true, crossoverMuteHigh = true
+                        )
+                    } else {
+                        settings.copy(crossoverSoloLow = false)
+                    }
+                }
+                "MID" -> {
+                    val s = !settings.crossoverSoloMid
+                    if (s) {
+                        settings.copy(
+                            crossoverSoloSub = false, crossoverSoloLow = false, crossoverSoloMid = true, crossoverSoloHigh = false,
+                            crossoverMuteSub = true, crossoverMuteLow = true, crossoverMuteMid = false, crossoverMuteHigh = true
+                        )
+                    } else {
+                        settings.copy(crossoverSoloMid = false)
+                    }
+                }
+                "HIGH" -> {
+                    val s = !settings.crossoverSoloHigh
+                    if (s) {
+                        settings.copy(
+                            crossoverSoloSub = false, crossoverSoloLow = false, crossoverSoloMid = false, crossoverSoloHigh = true,
+                            crossoverMuteSub = true, crossoverMuteLow = true, crossoverMuteMid = true, crossoverMuteHigh = false
+                        )
+                    } else {
+                        settings.copy(crossoverSoloHigh = false)
+                    }
+                }
+                else -> settings
+            }
+        }
+    }
+
+    fun toggleCrossoverPhase(channel: String) {
+        updateDbSettings { settings ->
+            when (channel) {
+                "SUB" -> settings.copy(crossoverPhaseSub = !settings.crossoverPhaseSub)
+                "LOW" -> settings.copy(crossoverPhaseLow = !settings.crossoverPhaseLow)
+                "MID" -> settings.copy(crossoverPhaseMid = !settings.crossoverPhaseMid)
+                "HIGH" -> settings.copy(crossoverPhaseHigh = !settings.crossoverPhaseHigh)
+                else -> settings
+            }
         }
     }
 
@@ -168,6 +259,10 @@ class AudioDspViewModel(application: Application) : AndroidViewModel(application
             AudioCaptureService.instance?.stopEngine()
             context.stopService(Intent(context, serviceClass))
         }
+    }
+
+    fun setInputEnabled(enabled: Boolean) {
+        AudioCaptureService.isInputEnabled.value = enabled
     }
 
     private fun updateDbSettings(modifier: (DspSettings) -> DspSettings) {

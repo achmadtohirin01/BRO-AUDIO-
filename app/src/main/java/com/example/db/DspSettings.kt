@@ -29,6 +29,27 @@ data class DspSettings(
     val isMuteL: Boolean = false,
     val isMuteR: Boolean = false,
 
+    // Crossover channel-specific fader columns matching professional boards (SUB, LOW, MID, HIGH)
+    val crossoverVolSub: Float = 1.0f,
+    val crossoverVolLow: Float = 1.0f,
+    val crossoverVolMid: Float = 1.0f,
+    val crossoverVolHigh: Float = 1.0f,
+
+    val crossoverMuteSub: Boolean = false,
+    val crossoverMuteLow: Boolean = false,
+    val crossoverMuteMid: Boolean = false,
+    val crossoverMuteHigh: Boolean = false,
+
+    val crossoverSoloSub: Boolean = false,
+    val crossoverSoloLow: Boolean = false,
+    val crossoverSoloMid: Boolean = false,
+    val crossoverSoloHigh: Boolean = false,
+
+    val crossoverPhaseSub: Boolean = false,
+    val crossoverPhaseLow: Boolean = false,
+    val crossoverPhaseMid: Boolean = false,
+    val crossoverPhaseHigh: Boolean = false,
+
     // Peak Limiter Controls
     val limiterAttackMs: Float = 5.0f,
     val limiterReleaseMs: Float = 100.0f,

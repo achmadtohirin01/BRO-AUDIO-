@@ -243,7 +243,19 @@ class DspProcessor {
         limiterAttack: Float, // ms
         limiterRelease: Float, // ms
         limiterKnee: Float, // dB
-        routingOrder: List<String>
+        routingOrder: List<String>,
+        crossoverVolSub: Float = 1.0f,
+        crossoverVolLow: Float = 1.0f,
+        crossoverVolMid: Float = 1.0f,
+        crossoverVolHigh: Float = 1.0f,
+        crossoverMuteSub: Boolean = false,
+        crossoverMuteLow: Boolean = false,
+        crossoverMuteMid: Boolean = false,
+        crossoverMuteHigh: Boolean = false,
+        crossoverPhaseSub: Boolean = false,
+        crossoverPhaseLow: Boolean = false,
+        crossoverPhaseMid: Boolean = false,
+        crossoverPhaseHigh: Boolean = false
     ) {
         var sumL = 0f
         var sumR = 0f
@@ -281,20 +293,52 @@ class DspProcessor {
                     "CROSSOVER" -> {
                         // 4-Way Linkwitz-Riley filter routing recombines sub, low, mid, high outputs
                         // Sub signal path
-                        val subL = crossSubLpL.process(crossSubHpL.process(sL))
-                        val subR = crossSubLpR.process(crossSubHpR.process(sR))
+                        var subL = crossSubLpL.process(crossSubHpL.process(sL))
+                        var subR = crossSubLpR.process(crossSubHpR.process(sR))
+                        if (crossoverMuteSub) {
+                            subL = 0f
+                            subR = 0f
+                        } else {
+                            val gSub = crossoverVolSub * (if (crossoverPhaseSub) -1.0f else 1.0f)
+                            subL *= gSub
+                            subR *= gSub
+                        }
 
                         // Low signal path
-                        val lowL = crossLowLpL.process(crossLowHpL.process(sL))
-                        val lowR = crossLowLpR.process(crossLowHpR.process(sR))
+                        var lowL = crossLowLpL.process(crossLowHpL.process(sL))
+                        var lowR = crossLowLpR.process(crossLowHpR.process(sR))
+                        if (crossoverMuteLow) {
+                            lowL = 0f
+                            lowR = 0f
+                        } else {
+                            val gLow = crossoverVolLow * (if (crossoverPhaseLow) -1.0f else 1.0f)
+                            lowL *= gLow
+                            lowR *= gLow
+                        }
 
                         // Mid signal path
-                        val midL = crossMidLpL.process(crossMidHpL.process(sL))
-                        val midR = crossMidLpR.process(crossMidHpR.process(sR))
+                        var midL = crossMidLpL.process(crossMidHpL.process(sL))
+                        var midR = crossMidLpR.process(crossMidHpR.process(sR))
+                        if (crossoverMuteMid) {
+                            midL = 0f
+                            midR = 0f
+                        } else {
+                            val gMid = crossoverVolMid * (if (crossoverPhaseMid) -1.0f else 1.0f)
+                            midL *= gMid
+                            midR *= gMid
+                        }
 
                         // High signal path
-                        val highL = crossHighHpL.process(sL)
-                        val highR = crossHighHpR.process(sR)
+                        var highL = crossHighHpL.process(sL)
+                        var highR = crossHighHpR.process(sR)
+                        if (crossoverMuteHigh) {
+                            highL = 0f
+                            highR = 0f
+                        } else {
+                            val gHigh = crossoverVolHigh * (if (crossoverPhaseHigh) -1.0f else 1.0f)
+                            highL *= gHigh
+                            highR *= gHigh
+                        }
 
                         // Recombine all bands to play full signal (simulating crossover sum output)
                         sL = subL + lowL + midL + highL

@@ -41,6 +41,7 @@ class AudioCaptureService : Service() {
         val liveSpectrum = MutableStateFlow(FloatArray(32) { 0f })
         val isEngineRunning = MutableStateFlow(false)
         val isCaptureModeActive = MutableStateFlow(false)
+        val isInputEnabled = MutableStateFlow(true)
         val audioStatusMessage = MutableStateFlow("Engine Offline")
     }
 
@@ -256,6 +257,11 @@ class AudioCaptureService : Service() {
                 // Read from real-time system audio input stream
                 val readSamples = record.read(scratchBuffer, 0, bufferSizeFloats, AudioRecord.READ_BLOCKING)
                 if (readSamples <= 0) continue
+
+                // Input ON/OFF gate check: if disabled, silence incoming buffer completely
+                if (!isInputEnabled.value) {
+                    scratchBuffer.fill(0f)
+                }
             } else {
                 // Fill scratchBuffer with zeros (silence) as requested - no sample/synthesized audio is generated!
                 scratchBuffer.fill(0f)
@@ -275,7 +281,19 @@ class AudioCaptureService : Service() {
                 limiterAttack = sets.limiterAttackMs,
                 limiterRelease = sets.limiterReleaseMs,
                 limiterKnee = sets.limiterKneeDb,
-                routingOrder = sets.getRoutingList()
+                routingOrder = sets.getRoutingList(),
+                crossoverVolSub = sets.crossoverVolSub,
+                crossoverVolLow = sets.crossoverVolLow,
+                crossoverVolMid = sets.crossoverVolMid,
+                crossoverVolHigh = sets.crossoverVolHigh,
+                crossoverMuteSub = sets.crossoverMuteSub,
+                crossoverMuteLow = sets.crossoverMuteLow,
+                crossoverMuteMid = sets.crossoverMuteMid,
+                crossoverMuteHigh = sets.crossoverMuteHigh,
+                crossoverPhaseSub = sets.crossoverPhaseSub,
+                crossoverPhaseLow = sets.crossoverPhaseLow,
+                crossoverPhaseMid = sets.crossoverPhaseMid,
+                crossoverPhaseHigh = sets.crossoverPhaseHigh
             )
 
             // Playback stream on output audiotrack

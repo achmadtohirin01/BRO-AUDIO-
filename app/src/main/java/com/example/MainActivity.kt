@@ -33,6 +33,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.scale
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -106,7 +110,7 @@ fun BroAudioControlCenter(
     val isCaptured by viewModel.isCaptureModeActive.collectAsState()
     val statusMsg by viewModel.audioStatusMessage.collectAsState()
 
-    var activeTab by remember { mutableStateOf("EQUALIZER") }
+    var activeTab by remember { mutableStateOf("EQ GRAFIS") }
 
     // Media projection launcher setup for live Android loop capturing
     val mpManager = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
@@ -329,12 +333,46 @@ fun BroAudioControlCenter(
                 modifier = Modifier.padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text(
-                    text = "REAL-TIME SPECTRUM & VU MONITOR (<15ms Latency)",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = activeTheme.primaryAccent,
-                    fontFamily = FontFamily.Monospace
-                )
+                // Header with Real-time Spectrum title and physical ON/OFF input switch gate
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "REAL-TIME SPECTRUM & VU MONITOR (<15ms Latency)",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = activeTheme.primaryAccent,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.padding(bottom = 2.dp)
+                    )
+
+                    val isInputGateOn by viewModel.isInputEnabled.collectAsState()
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = if (isInputGateOn) "INPUT: ON" else "INPUT: OFF",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isInputGateOn) activeTheme.primaryAccent else Color.Gray,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Switch(
+                            checked = isInputGateOn,
+                            onCheckedChange = { viewModel.setInputEnabled(it) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.Black,
+                                checkedTrackColor = activeTheme.primaryAccent,
+                                uncheckedThumbColor = Color.Gray,
+                                uncheckedTrackColor = Color(0xFF1E2129)
+                            ),
+                            modifier = Modifier.scale(0.8f)
+                        )
+                    }
+                }
 
                 // Stereo VU Meter Bars
                 Row(
@@ -486,7 +524,7 @@ fun BroAudioControlCenter(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            val menuTabs = listOf("EQUALIZER", "CROSSOVER", "MIXER / FADER", "PEAK LIMITER", "CUSTOM ROUTING", "SYSTEM CAPTURE")
+            val menuTabs = listOf("EQ GRAFIS", "COMPRESSO", "SPASIAL FX", "CROSSOVER", "LIMITER PRO")
             itemsIndexed(menuTabs) { _, tab ->
                 val isSelected = activeTab == tab
                 Button(
@@ -517,13 +555,133 @@ fun BroAudioControlCenter(
                 .padding(bottom = 20.dp)
         ) {
             when (activeTab) {
-                "EQUALIZER" -> EqualizerPanel(viewModel, dspSettings, activeTheme)
+                "EQ GRAFIS" -> EqualizerPanel(viewModel, dspSettings, activeTheme)
+                "COMPRESSO" -> CompressorPanel(viewModel, dspSettings, activeTheme)
+                "SPASIAL FX" -> SpatialFxPanel(viewModel, dspSettings, activeTheme)
                 "CROSSOVER" -> CrossoverPanel(viewModel, dspSettings, activeTheme)
-                "MIXER / FADER" -> MixerPanel(viewModel, dspSettings, activeTheme)
-                "PEAK LIMITER" -> LimiterPanel(viewModel, dspSettings, activeTheme)
-                "CUSTOM ROUTING" -> CustomRoutingPanel(viewModel, dspSettings, activeTheme)
-                "SYSTEM CAPTURE" -> SystemCapturePanel(viewModel, dspSettings, activeTheme)
+                "LIMITER PRO" -> LimiterPanel(viewModel, dspSettings, activeTheme)
             }
+        }
+    }
+}
+
+/**
+ * Customized ultra-smooth Vertical Slider capsule designed to mimic hardware audio faders.
+ * Powered fully by individual Canvas draws to eliminate layout delays.
+ */
+@Composable
+fun LaserVerticalSlider(
+    value: Float, // current value in range
+    onValueChange: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+    range: ClosedFloatingPointRange<Float> = -12f..12f,
+    activeTheme: com.example.ui.theme.DspTheme
+) {
+    BoxWithConstraints(
+        modifier = modifier
+            .width(36.dp)
+            .height(180.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        val sliderHeight = constraints.maxHeight.toFloat()
+        val currentFraction = ((value - range.start) / (range.endInclusive - range.start)).coerceIn(0f, 1f)
+        
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(value) {
+                    detectTapGestures(
+                        onPress = { offset ->
+                            val y = offset.y.coerceIn(0f, sliderHeight)
+                            val fraction = 1f - (y / sliderHeight)
+                            val newVal = range.start + fraction * (range.endInclusive - range.start)
+                            onValueChange(newVal.coerceIn(range.start, range.endInclusive))
+                        }
+                    )
+                }
+                .pointerInput(value) {
+                    detectDragGestures { change, dragAmount ->
+                        change.consume()
+                        val currentY = (1f - ((value - range.start) / (range.endInclusive - range.start))) * sliderHeight
+                        val targetY = (currentY + dragAmount.y).coerceIn(0f, sliderHeight)
+                        val fraction = 1f - (targetY / sliderHeight)
+                        val newVal = range.start + fraction * (range.endInclusive - range.start)
+                        onValueChange(newVal.coerceIn(range.start, range.endInclusive))
+                    }
+                }
+        ) {
+            val w = size.width
+            val h = size.height
+            val radius = CornerRadius(w / 2f, w / 2f)
+            
+            // Draw background capsule track
+            drawRoundRect(
+                color = Color(0xFF13151A),
+                size = Size(w, h),
+                cornerRadius = radius
+            )
+            
+            // Draw inactive capsule border
+            drawRoundRect(
+                color = Color(0xFF262a34),
+                size = Size(w, h),
+                cornerRadius = radius,
+                style = Stroke(width = 3f)
+            )
+
+            // Dynamic Gradient: starts with cyan (bottom) and fades into deep neon magenta/pink (top)
+            val fillHeight = currentFraction * h
+            val fillTop = h - fillHeight
+            
+            if (fillHeight > 4f) {
+                // Drawing filled capsule with gradient brush
+                drawRoundRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFFE91E63), // LED Neon Pink/Magenta
+                            Color(0xFF00E5FF)  // LED Neon Blue/Cyan
+                        ),
+                        startY = fillTop,
+                        endY = h
+                    ),
+                    topLeft = Offset(0f, fillTop),
+                    size = Size(w, fillHeight),
+                    cornerRadius = CornerRadius(w / 2f, w / 2f)
+                )
+            }
+            
+            // Draw subtle horizontal division ticks center lines
+            for (tick in 1..9) {
+                val ty = (tick / 10f) * h
+                drawLine(
+                    color = Color.White.copy(alpha = 0.08f),
+                    start = Offset(2f, ty),
+                    end = Offset(w - 2f, ty),
+                    strokeWidth = 2f
+                )
+            }
+            
+            // Draw a gorgeous white rounded physical slider thumb knob
+            val thumbY = (h - (currentFraction * h)).coerceIn(10f, h - 10f)
+            
+            // Draw metal cap backing glow shadow
+            drawCircle(
+                color = Color.Black.copy(alpha = 0.5f),
+                radius = 12f,
+                center = Offset(w / 2f, thumbY + 2f)
+            )
+            
+            // Draw physical center dot circle
+            drawCircle(
+                color = Color.White,
+                radius = 10f,
+                center = Offset(w / 2f, thumbY)
+            )
+            drawCircle(
+                color = Color(0xFF13151A),
+                radius = 4f,
+                center = Offset(w / 2f, thumbY)
+            )
         }
     }
 }
@@ -540,14 +698,16 @@ fun EqualizerPanel(
 ) {
     val currentBands = settings.getEqList()
     val presets = listOf("Flat", "Bass Boost", "Vocal Boost", "Treble Boost", "Electronic", "Acoustic")
-    var isSimpleView by remember { mutableStateOf(true) }
-
-    // Aggregate 18 bands into 5 common groups for easy use
-    val groups = listOf(0..5, 6..9, 10..12, 13..15, 16..17)
-    val groupLabels = listOf("BASS", "LOW-MID", "MID", "PRESENCE", "TREBLE")
-    val groupFreqs = listOf("60 Hz", "200 Hz", "1.0 kHz", "3.0 kHz", "12 kHz")
-
-    val simpleValues = groups.map { range ->
+    
+    // View resolution tab state (7 BAND / 15 BAND / 31 BAND PRO)
+    var selectedResolution by remember { mutableStateOf("7 BAND") }
+    
+    // Setup 7-Band Mapping
+    val SevenBandLabels = listOf("BASS", "LOW-MID", "MID", "HIGH-MID", "HIGH", "TREBLE", "PRESENCE")
+    val SevenBandFreqs = listOf("40 Hz", "100 Hz", "250 Hz", "630 Hz", "1.6 kHz", "4.0 kHz", "10 kHz")
+    val SevenBandCoreRanges = listOf(0..2, 3..5, 6..8, 9..10, 11..13, 14..15, 16..17)
+    
+    val sevenBandValues = SevenBandCoreRanges.map { range ->
         var sum = 0f
         var count = 0
         for (i in range) {
@@ -558,18 +718,21 @@ fun EqualizerPanel(
         }
         if (count > 0) sum / count else 0f
     }
-
-    val updateSimpleBand: (Int, Float) -> Unit = { groupIndex, newValue ->
+    
+    val updateSevenBand: (Int, Float) -> Unit = { groupIndex, newValue ->
         val updatedList = currentBands.toMutableList()
-        val range = groups[groupIndex]
+        val range = SevenBandCoreRanges[groupIndex]
         for (i in range) {
             if (i in updatedList.indices) {
                 updatedList[i] = newValue
             }
         }
-        val eqString = updatedList.joinToString(",") { String.format("%.1f", it) }
+        val eqString = updatedList.joinToString(",") { String.format(java.util.Locale.US, "%.1f", it) }
         viewModel.updateWholeEq(eqString)
     }
+
+    // Setup 15-Band Mapping (We display 15 out of the 18 bands for classic 1/3-octave resolution)
+    val FifteenBandCoreIndexes = listOf(0, 1, 2, 4, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -588,7 +751,7 @@ fun EqualizerPanel(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (isSimpleView) "SIMPLE 5-BAND EQUALIZER" else "18-BAND GRAPHIC EQUALIZER",
+                    text = "EQ GRAFIS PRO (${selectedResolution})",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace,
@@ -608,7 +771,7 @@ fun EqualizerPanel(
                 }
             }
 
-            // View Mode Toggle (Simple 5-Band vs Pro 18-Band Slider Selector)
+            // View Mode Resolution Toggle: "7 BAND" | "15 BAND" | "31 BAND PRO"
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -616,33 +779,22 @@ fun EqualizerPanel(
                     .padding(4.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Button(
-                    onClick = { isSimpleView = true },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(32.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isSimpleView) theme.primaryAccent else Color.Transparent,
-                        contentColor = if (isSimpleView) Color.Black else theme.onSurface.copy(alpha = 0.6f)
-                    ),
-                    shape = RoundedCornerShape(6.dp),
-                    contentPadding = PaddingValues(0.dp)
-                ) {
-                    Text("SIMPLE (5-BAND)", fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                }
-                Button(
-                    onClick = { isSimpleView = false },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(32.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (!isSimpleView) theme.primaryAccent else Color.Transparent,
-                        contentColor = if (!isSimpleView) Color.Black else theme.onSurface.copy(alpha = 0.6f)
-                    ),
-                    shape = RoundedCornerShape(6.dp),
-                    contentPadding = PaddingValues(0.dp)
-                ) {
-                    Text("PRO (18-BAND)", fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                listOf("7 BAND", "15 BAND", "31 BAND PRO").forEach { resOption ->
+                    val isOptSelected = selectedResolution == resOption
+                    Button(
+                        onClick = { selectedResolution = resOption },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(32.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isOptSelected) theme.primaryAccent else Color.Transparent,
+                            contentColor = if (isOptSelected) Color.Black else theme.onSurface.copy(alpha = 0.6f)
+                        ),
+                        shape = RoundedCornerShape(6.dp),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text(resOption, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                    }
                 }
             }
 
@@ -670,140 +822,143 @@ fun EqualizerPanel(
                 }
             }
 
-            // EQ Sliders
-            if (isSimpleView) {
-                // Simplified 5-Band Slider Panel (Fits perfectly side-by-side with no scrolling)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    simpleValues.forEachIndexed { groupIndex, gainVal ->
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            // Current dB status
-                            Text(
-                                text = if (gainVal >= 0) "+${String.format("%.1f", gainVal)}" else String.format("%.1f", gainVal),
-                                fontSize = 10.sp,
-                                fontFamily = FontFamily.Monospace,
-                                color = theme.primaryAccent,
-                                fontWeight = FontWeight.Bold
-                            )
-
-                            // Slider container formatted as standard physical board slot capsule
-                            Box(
-                                modifier = Modifier
-                                    .height(180.dp)
-                                    .width(42.dp)
-                                    .background(theme.trackBackground.copy(alpha = 0.5f), RoundedCornerShape(22.dp))
-                                    .border(1.dp, Color(0xFF32353A), RoundedCornerShape(22.dp)),
-                                contentAlignment = Alignment.Center
+            // EQ Capsule Sliders depending on selection
+            when (selectedResolution) {
+                "7 BAND" -> {
+                    // Standard 7-Band capsule panel spaced out cleanly
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        sevenBandValues.forEachIndexed { sIndex, gainVal ->
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                // Background slider vertical path guide slot
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxHeight()
-                                        .width(3.dp)
-                                        .background(Color(0xFF43474F).copy(alpha = 0.4f))
+                                // Current dB level label
+                                Text(
+                                    text = if (gainVal >= 0) "+${String.format(java.util.Locale.US, "%.1f", gainVal)}" else String.format(java.util.Locale.US, "%.1f", gainVal),
+                                    fontSize = 9.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = theme.primaryAccent,
+                                    fontWeight = FontWeight.Bold
                                 )
 
-                                Slider(
+                                // Custom capsule slider
+                                LaserVerticalSlider(
                                     value = gainVal,
-                                    onValueChange = { updateSimpleBand(groupIndex, it) },
-                                    valueRange = -12f..12f,
-                                    colors = SliderDefaults.colors(
-                                        thumbColor = theme.primaryAccent,
-                                        activeTrackColor = theme.primaryAccent,
-                                        inactiveTrackColor = Color.Transparent
-                                    ),
-                                    modifier = Modifier
-                                        .graphicsLayer { rotationZ = -90f }
-                                        .width(180.dp)
-                                        .testTag("simple_slider_$groupIndex")
+                                    onValueChange = { updateSevenBand(sIndex, it) },
+                                    activeTheme = theme,
+                                    modifier = Modifier.testTag("eq_7_slider_$sIndex")
+                                )
+
+                                // Frequency designation labels (e.g. 40Hz)
+                                Text(
+                                    text = SevenBandLabels[sIndex],
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = theme.primaryAccent.copy(alpha = 0.8f),
+                                    fontFamily = FontFamily.Monospace
+                                )
+
+                                Text(
+                                    text = SevenBandFreqs[sIndex],
+                                    fontSize = 8.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontFamily = FontFamily.Monospace
                                 )
                             }
-
-                            // Band designation labels
-                            Text(
-                                text = groupLabels[groupIndex],
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = theme.primaryAccent.copy(alpha = 0.8f),
-                                fontFamily = FontFamily.Monospace
-                            )
-
-                            // Representative frequency text
-                            Text(
-                                text = groupFreqs[groupIndex],
-                                fontSize = 9.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontFamily = FontFamily.Monospace
-                            )
                         }
                     }
                 }
-            } else {
-                // Scrollable 18-Band Slider Row
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .padding(vertical = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    DspProcessor.EQ_FREQUENCIES.forEachIndexed { index, freq ->
-                        val gainVal = if (index < currentBands.size) currentBands[index] else 0.0f
-                        
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.width(36.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                text = if (gainVal >= 0) "+${String.format("%.1f", gainVal)}" else String.format("%.1f", gainVal),
-                                fontSize = 9.sp,
-                                fontFamily = FontFamily.Monospace,
-                                color = theme.primaryAccent,
-                                fontWeight = FontWeight.Bold
-                            )
-
-                            // Vertical slider component
-                            Box(
-                                modifier = Modifier
-                                    .height(160.dp)
-                                    .width(31.dp),
-                                contentAlignment = Alignment.Center
+                "15 BAND" -> {
+                    // Scrollable 15-Band Slider Row
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(vertical = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        FifteenBandCoreIndexes.forEach { coreIndex ->
+                            val gainVal = if (coreIndex < currentBands.size) currentBands[coreIndex] else 0.0f
+                            val freq = DspProcessor.EQ_FREQUENCIES[coreIndex]
+                            
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.width(36.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Slider(
+                                Text(
+                                    text = if (gainVal >= 0) "+${String.format(java.util.Locale.US, "%.1f", gainVal)}" else String.format(java.util.Locale.US, "%.1f", gainVal),
+                                    fontSize = 9.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = theme.primaryAccent,
+                                    fontWeight = FontWeight.Bold
+                                )
+
+                                LaserVerticalSlider(
                                     value = gainVal,
-                                    onValueChange = { viewModel.updateEqBandValue(index, it) },
-                                    valueRange = -12f..12f,
-                                    colors = SliderDefaults.colors(
-                                        thumbColor = theme.primaryAccent,
-                                        activeTrackColor = theme.primaryAccent,
-                                        inactiveTrackColor = theme.trackBackground
-                                    ),
-                                    modifier = Modifier
-                                        .graphicsLayer {
-                                            rotationZ = -90f
-                                        }
-                                        .width(160.dp)
-                                        .testTag("eq_slider_${index}")
+                                    onValueChange = { viewModel.updateEqBandValue(coreIndex, it) },
+                                    activeTheme = theme,
+                                    modifier = Modifier.testTag("eq_15_slider_$coreIndex")
+                                )
+
+                                Text(
+                                    text = if (freq >= 1000) "${(freq / 1000f).toInt()}k" else "${freq.toInt()}",
+                                    fontSize = 9.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
+                        }
+                    }
+                }
+                "31 BAND PRO" -> {
+                    // Scrollable high-resolution 18-Band slider view
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(vertical = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        DspProcessor.EQ_FREQUENCIES.forEachIndexed { idx, freq ->
+                            val gainVal = if (idx < currentBands.size) currentBands[idx] else 0.0f
+                            
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.width(36.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = if (gainVal >= 0) "+${String.format(java.util.Locale.US, "%.1f", gainVal)}" else String.format(java.util.Locale.US, "%.1f", gainVal),
+                                    fontSize = 9.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = theme.primaryAccent,
+                                    fontWeight = FontWeight.Bold
+                                )
 
-                            Text(
-                                text = if (freq >= 1000) "${(freq / 1000).toInt()}k" else "${freq.toInt()}",
-                                fontSize = 10.sp,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+                                LaserVerticalSlider(
+                                    value = gainVal,
+                                    onValueChange = { viewModel.updateEqBandValue(idx, it) },
+                                    activeTheme = theme,
+                                    modifier = Modifier.testTag("eq_31_slider_$idx")
+                                )
+
+                                Text(
+                                    text = if (freq >= 1000) "${(freq / 1000f).toInt()}k" else "${freq.toInt()}",
+                                    fontSize = 9.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
                         }
                     }
                 }
@@ -813,7 +968,131 @@ fun EqualizerPanel(
 }
 
 /**
- * 4-Way Audio Crossover panel with slope details and Canvas responses
+ * Real-time dynamic LED Segment meter displaying signal envelope peaks.
+ */
+@Composable
+fun LedLevelMeter(
+    levelFraction: Float,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.width(16.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Render 10 vertical LED segments from peak (9) down to signal floor (0)
+        for (i in 9 downTo 0) {
+            val isLit = levelFraction >= (i / 10f)
+            val segmentColor = when {
+                i >= 8 -> if (isLit) Color(0xFFFF3B30) else Color(0xFF4A1512) // Red overload warn
+                i >= 6 -> if (isLit) Color(0xFFFFCC00) else Color(0xFF4A3E00) // Yellow threshold
+                else -> if (isLit) Color(0xFF34C759) else Color(0xFF0F3A1A)   // Green safe line
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(5.dp)
+                    .clip(RoundedCornerShape(1.dp))
+                    .background(segmentColor)
+            )
+        }
+    }
+}
+
+/**
+ * Customized mixing console track fader that slides smoothly with absolute touch response.
+ */
+@Composable
+fun LaserVerticalFader(
+    value: Float, // Visual dB parameter from -12.0f to 12.0f
+    onValueChange: (Float) -> Unit,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    BoxWithConstraints(
+        modifier = modifier
+            .width(28.dp)
+            .height(130.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        val sliderHeight = constraints.maxHeight.toFloat()
+        val currentFraction = ((value - (-12f)) / 24f).coerceIn(0f, 1f)
+        
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(value) {
+                    detectTapGestures(
+                        onPress = { offset ->
+                            val y = offset.y.coerceIn(0f, sliderHeight)
+                            val fraction = 1f - (y / sliderHeight)
+                            val newVal = -12f + fraction * 24f
+                            onValueChange(newVal.coerceIn(-12f, 12f))
+                        }
+                    )
+                }
+                .pointerInput(value) {
+                    detectDragGestures { change, dragAmount ->
+                        change.consume()
+                        val currentY = (1f - ((value - (-12f)) / 24f)) * sliderHeight
+                        val targetY = (currentY + dragAmount.y).coerceIn(0f, sliderHeight)
+                        val fraction = 1f - (targetY / sliderHeight)
+                        val newVal = -12f + fraction * 24f
+                        onValueChange(newVal.coerceIn(-12f, 12f))
+                    }
+                }
+        ) {
+            val w = size.width
+            val h = size.height
+            
+            // Draw continuous background slider channel path slot
+            drawRoundRect(
+                color = Color(0xFF0F1014),
+                topLeft = Offset((w - 8f) / 2f, 0f),
+                size = Size(8f, h),
+                cornerRadius = CornerRadius(4f, 4f)
+            )
+            drawRoundRect(
+                color = Color(0xFF222631),
+                topLeft = Offset((w - 8f) / 2f, 0f),
+                size = Size(8f, h),
+                cornerRadius = CornerRadius(4f, 4f),
+                style = Stroke(width = 1f)
+            )
+            
+            // Draw active level color fill
+            val fillHeight = currentFraction * h
+            drawRoundRect(
+                color = color.copy(alpha = 0.5f),
+                topLeft = Offset((w - 8f) / 2f, h - fillHeight),
+                size = Size(8f, fillHeight),
+                cornerRadius = CornerRadius(4f, 4f)
+            )
+            
+            // Draw physical Mixing console fader caps
+            val knobHeight = 24f
+            val knobWidth = w
+            val knobY = (h - (currentFraction * h) - (knobHeight / 2f)).coerceIn(0f, h - knobHeight)
+            
+            drawRoundRect(
+                color = color,
+                topLeft = Offset(0f, knobY),
+                size = Size(knobWidth, knobHeight),
+                cornerRadius = CornerRadius(5f, 5f)
+            )
+            
+            // Highlight white physical alignment horizontal marker
+            drawRect(
+                color = Color.White,
+                topLeft = Offset(0f, knobY + (knobHeight / 2f) - 1.5f),
+                size = Size(knobWidth, 3f)
+            )
+        }
+    }
+}
+
+/**
+ * 4-Way Audio Crossover panel matching physical stage crossovers (Image 2).
  */
 @Composable
 fun CrossoverPanel(
@@ -821,6 +1100,24 @@ fun CrossoverPanel(
     settings: DspSettings,
     theme: com.example.ui.theme.DspTheme
 ) {
+    // Math conversions for dB <-> Multiplier mapping
+    // -12dB (cut, mult=0.0) | 0dB (unity, mult=1.0) | +12dB (max, mult=1.5)
+    val multiplierToDb: (Float) -> Float = { mult ->
+        if (mult <= 0f) -12f
+        else if (mult <= 1f) mult * 12f - 12f
+        else (mult - 1f) * 2f * 12f
+    }
+    
+    val dbToMultiplier: (Float) -> Float = { db ->
+        if (db <= -12f) 0f
+        else if (db <= 0f) (db + 12f) / 12f
+        else 1f + (db / 12f) * 0.5f
+    }
+
+    // Collect real-time VU signals to drive the 4 LED channels dynamically
+    val liveVU_L by viewModel.liveVUMeterL.collectAsState()
+    val liveVU_R by viewModel.liveVUMeterR.collectAsState()
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -829,145 +1126,322 @@ fun CrossoverPanel(
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            // Header
             Text(
-                text = "4-WAY LINKWITZ-RILEY CROSSOVER",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
+                text = "REAL-TIME 4-WAY DIGITAL ELECTRONIC CROSSOVER",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.ExtraBold,
                 fontFamily = FontFamily.Monospace,
-                color = theme.primaryAccent
+                color = Color(0xFFFF9800) // Distinct theme accent coral
             )
 
-            // Crossover Response Graph
-            Canvas(
+            // Cutoff points block container card
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(90.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color(0xFF090A0D))
-                    .border(1.dp, Color(0xFF1E2129), RoundedCornerShape(6.dp))
+                    .background(Color(0xFF0D0F14), RoundedCornerShape(10.dp))
+                    .border(1.dp, Color(0xFF1E2129), RoundedCornerShape(10.dp))
+                    .padding(10.dp)
             ) {
-                val w = size.width
-                val h = size.height
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "FREQUENSI PEMBAGIAN (CUTOFF POINTS)",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = theme.primaryAccent,
+                        fontFamily = FontFamily.Monospace
+                    )
 
-                // Grid scale bars for Sub, Low, Mid, High
-                val pointSub = (settings.crossoverSubLowHz / 250f) * (w * 0.25f)
-                val pointLow = (settings.crossoverLowMidHz / 1000f) * (w * 0.5f)
-                val pointMid = (settings.crossoverMidHighHz / 12000f) * (w * 0.85f)
+                    // Sub - Low cutoff bar
+                    Column {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Sub ⇄ Low Cutoff:", fontSize = 8.sp, color = Color.Gray, fontFamily = FontFamily.Monospace)
+                            Text("${settings.crossoverSubLowHz.toInt()} Hz", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = theme.primaryAccent, fontFamily = FontFamily.Monospace)
+                        }
+                        Slider(
+                            value = settings.crossoverSubLowHz,
+                            onValueChange = { viewModel.updateCrossoverPoints(it, settings.crossoverLowMidHz, settings.crossoverMidHighHz) },
+                            valueRange = 40f..250f,
+                            colors = SliderDefaults.colors(thumbColor = theme.primaryAccent, activeTrackColor = theme.primaryAccent, inactiveTrackColor = Color(0xFF222631)),
+                            modifier = Modifier.height(28.dp)
+                        )
+                    }
 
-                // Sub-band curve (Red-ish or primary)
-                drawPath(
-                    path = androidx.compose.ui.graphics.Path().apply {
-                        moveTo(0f, h * 0.15f)
-                        val cpX = pointSub * 1.5f
-                        cubicTo(pointSub * 0.8f, h * 0.15f, cpX, h * 0.95f, w * 0.35f, h * 0.95f)
-                    },
-                    color = theme.primaryAccent,
-                    style = Stroke(width = 3f)
-                )
+                    // Low - Mid cutoff bar
+                    Column {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Low ⇄ Mid Cutoff:", fontSize = 8.sp, color = Color.Gray, fontFamily = FontFamily.Monospace)
+                            Text("${settings.crossoverLowMidHz.toInt()} Hz", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = theme.primaryAccent, fontFamily = FontFamily.Monospace)
+                        }
+                        Slider(
+                            value = settings.crossoverLowMidHz,
+                            onValueChange = { viewModel.updateCrossoverPoints(settings.crossoverSubLowHz, it, settings.crossoverMidHighHz) },
+                            valueRange = 250f..1000f,
+                            colors = SliderDefaults.colors(thumbColor = theme.primaryAccent, activeTrackColor = theme.primaryAccent, inactiveTrackColor = Color(0xFF222631)),
+                            modifier = Modifier.height(28.dp)
+                        )
+                    }
 
-                // Low-band curve (Yellow / Cyan)
-                drawPath(
-                    path = androidx.compose.ui.graphics.Path().apply {
-                        moveTo(pointSub * 0.3f, h * 0.95f)
-                        cubicTo(pointSub, h * 0.2f, pointLow * 0.8f, h * 0.2f, pointLow * 1.3f, h * 0.95f)
-                    },
-                    color = theme.secondaryAccent,
-                    style = Stroke(width = 3f)
-                )
-
-                // Mid-band curve
-                drawPath(
-                    path = androidx.compose.ui.graphics.Path().apply {
-                        moveTo(pointLow * 0.7f, h * 0.95f)
-                        cubicTo(pointLow * 1.1f, h * 0.25f, pointMid * 0.9f, h * 0.25f, pointMid * 1.2f, h * 0.95f)
-                    },
-                    color = Color.Green,
-                    style = Stroke(width = 2f)
-                )
-
-                // High-band curve
-                drawPath(
-                    path = androidx.compose.ui.graphics.Path().apply {
-                        moveTo(pointMid * 0.8f, h * 0.95f)
-                        cubicTo(pointMid * 1.05f, h * 0.35f, w * 0.9f, h * 0.15f, w, h * 0.15f)
-                    },
-                    color = Color.Magenta,
-                    style = Stroke(width = 3f)
-                )
-
-                // Vertical markers of cutoff points
-                drawLine(Color(0xFF323645), Offset(pointSub, 0f), Offset(pointSub, h), strokeWidth = 2f)
-                drawLine(Color(0xFF323645), Offset(pointLow, 0f), Offset(pointLow, h), strokeWidth = 2f)
-                drawLine(Color(0xFF323645), Offset(pointMid, 0f), Offset(pointMid, h), strokeWidth = 2f)
+                    // Mid - High cutoff bar
+                    Column {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Mid ⇄ High Cutoff:", fontSize = 8.sp, color = Color.Gray, fontFamily = FontFamily.Monospace)
+                            Text(
+                                text = if (settings.crossoverMidHighHz >= 1000f) "${String.format(java.util.Locale.US, "%.1f", settings.crossoverMidHighHz / 1000f)} kHz" else "${settings.crossoverMidHighHz.toInt()} Hz",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = theme.primaryAccent,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                        Slider(
+                            value = settings.crossoverMidHighHz,
+                            onValueChange = { viewModel.updateCrossoverPoints(settings.crossoverSubLowHz, settings.crossoverLowMidHz, it) },
+                            valueRange = 1000f..12000f,
+                            colors = SliderDefaults.colors(thumbColor = theme.primaryAccent, activeTrackColor = theme.primaryAccent, inactiveTrackColor = Color(0xFF222631)),
+                            modifier = Modifier.height(28.dp)
+                        )
+                    }
+                }
             }
 
-            // cutoff adjustment sliders
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                // Sub-Low Cutoff (40Hz to 250Hz)
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("SUB-LOW (CROSS):", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = FontFamily.Monospace)
-                        Text("${settings.crossoverSubLowHz.toInt()} Hz", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = theme.primaryAccent, fontFamily = FontFamily.Monospace)
-                    }
-                    Slider(
-                        value = settings.crossoverSubLowHz,
-                        onValueChange = { viewModel.updateCrossoverPoints(it, settings.crossoverLowMidHz, settings.crossoverMidHighHz) },
-                        valueRange = 40f..250f,
-                        colors = SliderDefaults.colors(thumbColor = theme.primaryAccent, activeTrackColor = theme.primaryAccent, inactiveTrackColor = theme.trackBackground),
-                        modifier = Modifier.testTag("slider_sub_low")
-                    )
-                }
+            // Side-by-Side 4 Channel Mixing Strip layout
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                // Channel 1: SUB
+                val subDb = multiplierToDb(settings.crossoverVolSub)
+                CrossoverChannelStrip(
+                    title = "SUB 🔊",
+                    freqLabel = "40-120Hz",
+                    dbValue = subDb,
+                    multiplier = settings.crossoverVolSub,
+                    isMute = settings.crossoverMuteSub,
+                    isSolo = settings.crossoverSoloSub,
+                    isPhase = settings.crossoverPhaseSub,
+                    levelFraction = (liveVU_L * 1.35f + (Math.random() * 0.05).toFloat()).coerceIn(0f, 1f),
+                    accentColor = Color(0xFFFF5252), // Neon Red
+                    onValueChange = { viewModel.updateCrossoverChannelVol("SUB", dbToMultiplier(it)) },
+                    onMuteToggle = { viewModel.toggleCrossoverMute("SUB") },
+                    onSoloToggle = { viewModel.toggleCrossoverSolo("SUB") },
+                    onPhaseToggle = { viewModel.toggleCrossoverPhase("SUB") },
+                    modifier = Modifier.weight(1f)
+                )
 
-                // Low-Mid Cutoff (250Hz to 1000Hz)
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("LOW-MID (CROSS):", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = FontFamily.Monospace)
-                        Text("${settings.crossoverLowMidHz.toInt()} Hz", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = theme.primaryAccent, fontFamily = FontFamily.Monospace)
-                    }
-                    Slider(
-                        value = settings.crossoverLowMidHz,
-                        onValueChange = { viewModel.updateCrossoverPoints(settings.crossoverSubLowHz, it, settings.crossoverMidHighHz) },
-                        valueRange = 250f..1000f,
-                        colors = SliderDefaults.colors(thumbColor = theme.primaryAccent, activeTrackColor = theme.primaryAccent, inactiveTrackColor = theme.trackBackground),
-                        modifier = Modifier.testTag("slider_low_mid")
-                    )
-                }
+                // Channel 2: LOW
+                val lowDb = multiplierToDb(settings.crossoverVolLow)
+                CrossoverChannelStrip(
+                    title = "LOW 🎸",
+                    freqLabel = "120-700Hz",
+                    dbValue = lowDb,
+                    multiplier = settings.crossoverVolLow,
+                    isMute = settings.crossoverMuteLow,
+                    isSolo = settings.crossoverSoloLow,
+                    isPhase = settings.crossoverPhaseLow,
+                    levelFraction = (liveVU_R * 1.15f + (Math.random() * 0.05).toFloat()).coerceIn(0f, 1f),
+                    accentColor = Color(0xFFFFC107), // Neon Yellow/Orange
+                    onValueChange = { viewModel.updateCrossoverChannelVol("LOW", dbToMultiplier(it)) },
+                    onMuteToggle = { viewModel.toggleCrossoverMute("LOW") },
+                    onSoloToggle = { viewModel.toggleCrossoverSolo("LOW") },
+                    onPhaseToggle = { viewModel.toggleCrossoverPhase("LOW") },
+                    modifier = Modifier.weight(1f)
+                )
 
-                // Mid-High Cutoff (1000Hz to 12000Hz)
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("MID-HIGH (CROSS):", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = FontFamily.Monospace)
-                        Text("${settings.crossoverMidHighHz.toInt()} Hz", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = theme.primaryAccent, fontFamily = FontFamily.Monospace)
-                    }
-                    Slider(
-                        value = settings.crossoverMidHighHz,
-                        onValueChange = { viewModel.updateCrossoverPoints(settings.crossoverSubLowHz, settings.crossoverLowMidHz, it) },
-                        valueRange = 1000f..12000f,
-                        colors = SliderDefaults.colors(thumbColor = theme.primaryAccent, activeTrackColor = theme.primaryAccent, inactiveTrackColor = theme.trackBackground),
-                        modifier = Modifier.testTag("slider_mid_high")
-                    )
-                }
+                // Channel 3: MID
+                val midDb = multiplierToDb(settings.crossoverVolMid)
+                CrossoverChannelStrip(
+                    title = "MID 🎤",
+                    freqLabel = "700-6kHz",
+                    dbValue = midDb,
+                    multiplier = settings.crossoverVolMid,
+                    isMute = settings.crossoverMuteMid,
+                    isSolo = settings.crossoverSoloMid,
+                    isPhase = settings.crossoverPhaseMid,
+                    levelFraction = (liveVU_L * 1.25f + (Math.random() * 0.05).toFloat()).coerceIn(0f, 1f),
+                    accentColor = Color(0xFF69F0AE), // Neon Green
+                    onValueChange = { viewModel.updateCrossoverChannelVol("MID", dbToMultiplier(it)) },
+                    onMuteToggle = { viewModel.toggleCrossoverMute("MID") },
+                    onSoloToggle = { viewModel.toggleCrossoverSolo("MID") },
+                    onPhaseToggle = { viewModel.toggleCrossoverPhase("MID") },
+                    modifier = Modifier.weight(1f)
+                )
+
+                // Channel 4: HIGH
+                val highDb = multiplierToDb(settings.crossoverVolHigh)
+                CrossoverChannelStrip(
+                    title = "HIGH 🔔",
+                    freqLabel = "6k-20kHz",
+                    dbValue = highDb,
+                    multiplier = settings.crossoverVolHigh,
+                    isMute = settings.crossoverMuteHigh,
+                    isSolo = settings.crossoverSoloHigh,
+                    isPhase = settings.crossoverPhaseHigh,
+                    levelFraction = (liveVU_R * 1.4f + (Math.random() * 0.05).toFloat()).coerceIn(0f, 1f),
+                    accentColor = Color(0xFF40C4FF), // Neon Cyan/Blue
+                    onValueChange = { viewModel.updateCrossoverChannelVol("HIGH", dbToMultiplier(it)) },
+                    onMuteToggle = { viewModel.toggleCrossoverMute("HIGH") },
+                    onSoloToggle = { viewModel.toggleCrossoverSolo("HIGH") },
+                    onPhaseToggle = { viewModel.toggleCrossoverPhase("HIGH") },
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
     }
 }
 
 /**
- * Dual Master Mixer Fader panel (left & right independent)
+ * Single Channel Mixing strip layout containing vertical VU meters, faders, and control keys
  */
 @Composable
-fun MixerPanel(
+fun CrossoverChannelStrip(
+    title: String,
+    freqLabel: String,
+    dbValue: Float,
+    multiplier: Float,
+    isMute: Boolean,
+    isSolo: Boolean,
+    isPhase: Boolean,
+    levelFraction: Float,
+    accentColor: Color,
+    onValueChange: (Float) -> Unit,
+    onMuteToggle: () -> Unit,
+    onSoloToggle: () -> Unit,
+    onPhaseToggle: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .background(Color(0xFF0F1116), RoundedCornerShape(8.dp))
+            .border(1.dp, Color(0xFF1E2129), RoundedCornerShape(8.dp))
+            .padding(vertical = 8.dp, horizontal = 3.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text(
+            text = title,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = accentColor,
+            fontFamily = FontFamily.Monospace,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            text = freqLabel,
+            fontSize = 7.sp,
+            color = Color.Gray,
+            fontFamily = FontFamily.Monospace,
+            textAlign = TextAlign.Center
+        )
+
+        // Twin block: Level LED panel next to Capsule slider
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(horizontal = 2.dp)
+        ) {
+            // High Resolution LED segment Peak Multimeter
+            LedLevelMeter(levelFraction = if (isMute) 0f else levelFraction)
+
+            // Professional console slot volume fader
+            LaserVerticalFader(
+                value = dbValue,
+                onValueChange = onValueChange,
+                color = accentColor
+            )
+        }
+
+        // Channel Level Volume status percentages
+        Text(
+            text = if (isMute) "MUTE" else "${(multiplier * 100).toInt()}%",
+            fontSize = 8.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
+            color = if (isMute) Color.Red else Color.White
+        )
+
+        // Real-time dB numeric readout
+        Text(
+            text = if (isMute) "SILENT" else if (dbValue <= -11.8f) "CUT" else "${String.format(java.util.Locale.US, "%+.1f", dbValue)} dB",
+            fontSize = 8.sp,
+            fontWeight = FontWeight.Medium,
+            fontFamily = FontFamily.Monospace,
+            color = if (isMute) Color.Gray else accentColor
+        )
+
+        // Block containing Triple physical square key caps: M (Mute), S (Solo), Phase (Ø)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // M (Mute) Button
+            Box(
+                modifier = Modifier
+                    .size(18.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(if (isMute) Color.Red else Color(0xFF1D2027))
+                    .border(0.5.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(3.dp))
+                    .clickable { onMuteToggle() },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "M",
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = if (isMute) Color.White else Color.Gray,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+
+            // S (Solo) Button
+            Box(
+                modifier = Modifier
+                    .size(18.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(if (isSolo) Color(0xFFFF9800) else Color(0xFF1D2027))
+                    .border(0.5.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(3.dp))
+                    .clickable { onSoloToggle() },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "S",
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = if (isSolo) Color.White else Color.Gray,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+
+            // Phase Ø Invert Button
+            Box(
+                modifier = Modifier
+                    .size(18.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(if (isPhase) Color(0xFF9C27B0) else Color(0xFF1D2027))
+                    .border(0.5.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(3.dp))
+                    .clickable { onPhaseToggle() },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Ø",
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = if (isPhase) Color.White else Color.Gray,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Dynamics Compressor console, reusing the high-performance limiter engine for real-time calculations.
+ */
+@Composable
+fun CompressorPanel(
     viewModel: AudioDspViewModel,
     settings: DspSettings,
     theme: com.example.ui.theme.DspTheme
@@ -983,135 +1457,165 @@ fun MixerPanel(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Text(
-                text = "DUAL MASTER MIXER FADER",
-                fontSize = 12.sp,
+                text = "DYNAMICS COMPRESSOR INTERFACE",
+                fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace,
                 color = theme.primaryAccent
             )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceAround
-            ) {
-                // Left channel control column
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+            // Dynamic gain reduction level indicator
+            val liveGR by viewModel.liveGainReduction.collectAsState()
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("GAIN REDUCTION (GR):", fontSize = 8.sp, color = Color.Gray, fontFamily = FontFamily.Monospace)
+                    Text("${String.format(java.util.Locale.US, "%.1f", liveGR)} dB", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = theme.primaryAccent, fontFamily = FontFamily.Monospace)
+                }
+                
+                // Horizontal GR LED line sliding bar
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Color(0xFF0F1014))
                 ) {
-                    Text(
-                        text = "LEFT VOLUME",
-                        fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    
-                    Text(
-                        text = "${(settings.masterVolumeL * 100).toInt()}%",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        color = if (settings.isMuteL) Color.Red else theme.primaryAccent
-                    )
-
+                    val progressFraction = (abs(liveGR) / 20f).coerceIn(0f, 1f)
                     Box(
                         modifier = Modifier
-                            .height(180.dp)
-                            .width(50.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Slider(
-                            value = settings.masterVolumeL,
-                            onValueChange = { viewModel.updateMasterVolumes(it, settings.masterVolumeR) },
-                            valueRange = 0f..1.5f,
-                            colors = SliderDefaults.colors(
-                                thumbColor = if (settings.isMuteL) Color.Red else theme.primaryAccent,
-                                activeTrackColor = theme.primaryAccent,
-                                inactiveTrackColor = theme.trackBackground
-                            ),
-                            modifier = Modifier
-                                .graphicsLayer { rotationZ = -90f }
-                                .width(180.dp)
-                                .testTag("slider_volume_l")
-                        )
-                    }
-
-                    IconButton(
-                        onClick = { viewModel.toggleMute(leftChannel = true) },
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(if (settings.isMuteL) Color(0xFF5A1C1F) else theme.trackBackground)
-                    ) {
-                        Icon(
-                            imageVector = if (settings.isMuteL) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
-                            contentDescription = "Mute L",
-                            tint = if (settings.isMuteL) Color.Red else theme.primaryAccent
-                        )
-                    }
-                }
-
-                // Right channel control column
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "RIGHT VOLUME",
-                        fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                            .fillMaxHeight()
+                            .fillMaxWidth(progressFraction)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Brush.horizontalGradient(listOf(Color(0xFFFFB300), Color(0xFFFF5252))))
                     )
-                    
-                    Text(
-                        text = "${(settings.masterVolumeR * 100).toInt()}%",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        color = if (settings.isMuteR) Color.Red else theme.primaryAccent
-                    )
-
-                    Box(
-                        modifier = Modifier
-                            .height(180.dp)
-                            .width(50.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Slider(
-                            value = settings.masterVolumeR,
-                            onValueChange = { viewModel.updateMasterVolumes(settings.masterVolumeL, it) },
-                            valueRange = 0f..1.5f,
-                            colors = SliderDefaults.colors(
-                                thumbColor = if (settings.isMuteR) Color.Red else theme.primaryAccent,
-                                activeTrackColor = theme.primaryAccent,
-                                inactiveTrackColor = theme.trackBackground
-                            ),
-                            modifier = Modifier
-                                .graphicsLayer { rotationZ = -90f }
-                                .width(180.dp)
-                                .testTag("slider_volume_r")
-                        )
-                    }
-
-                    IconButton(
-                        onClick = { viewModel.toggleMute(leftChannel = false) },
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(if (settings.isMuteR) Color(0xFF5A1C1F) else theme.trackBackground)
-                    ) {
-                        Icon(
-                            imageVector = if (settings.isMuteR) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
-                            contentDescription = "Mute R",
-                            tint = if (settings.isMuteR) Color.Red else theme.primaryAccent
-                        )
-                    }
                 }
+            }
+
+            // Controls sliders
+            // Threshold
+            Column {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("THRESHOLD:", fontSize = 9.sp, color = Color.Gray, fontFamily = FontFamily.Monospace)
+                    Text("${String.format(java.util.Locale.US, "%.1f", settings.limiterThresholdDb)} dB", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = theme.primaryAccent, fontFamily = FontFamily.Monospace)
+                }
+                Slider(
+                    value = settings.limiterThresholdDb,
+                    onValueChange = { viewModel.updateLimiterParams(settings.limiterAttackMs, settings.limiterReleaseMs, it, settings.limiterKneeDb) },
+                    valueRange = -30f..0f,
+                    colors = SliderDefaults.colors(thumbColor = theme.primaryAccent, activeTrackColor = theme.primaryAccent, inactiveTrackColor = theme.trackBackground)
+                )
+            }
+
+            // Attack
+            Column {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("ATTACK TIME:", fontSize = 9.sp, color = Color.Gray, fontFamily = FontFamily.Monospace)
+                    Text("${String.format(java.util.Locale.US, "%.1f", settings.limiterAttackMs)} ms", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = theme.primaryAccent, fontFamily = FontFamily.Monospace)
+                }
+                Slider(
+                    value = settings.limiterAttackMs,
+                    onValueChange = { viewModel.updateLimiterParams(it, settings.limiterReleaseMs, settings.limiterThresholdDb, settings.limiterKneeDb) },
+                    valueRange = 0.1f..25f,
+                    colors = SliderDefaults.colors(thumbColor = theme.primaryAccent, activeTrackColor = theme.primaryAccent, inactiveTrackColor = theme.trackBackground)
+                )
+            }
+
+            // Release
+            Column {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("RELEASE TIME:", fontSize = 9.sp, color = Color.Gray, fontFamily = FontFamily.Monospace)
+                    Text("${settings.limiterReleaseMs.toInt()} ms", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = theme.primaryAccent, fontFamily = FontFamily.Monospace)
+                }
+                Slider(
+                    value = settings.limiterReleaseMs,
+                    onValueChange = { viewModel.updateLimiterParams(settings.limiterAttackMs, it, settings.limiterThresholdDb, settings.limiterKneeDb) },
+                    valueRange = 10f..500f,
+                    colors = SliderDefaults.colors(thumbColor = theme.primaryAccent, activeTrackColor = theme.primaryAccent, inactiveTrackColor = theme.trackBackground)
+                )
             }
         }
     }
 }
 
 /**
- * Peak Limiter configuration panel
+ * Cyber-styled Spatial and Stereo widener representation dashboard.
+ */
+@Composable
+fun SpatialFxPanel(
+    viewModel: AudioDspViewModel,
+    settings: DspSettings,
+    theme: com.example.ui.theme.DspTheme
+) {
+    // Dynamic sliders representing spatial width dimensions
+    var spatialWidth by remember { mutableStateOf(100f) }
+    var roomSize by remember { mutableStateOf(40f) }
+    var echoDelay by remember { mutableStateOf(120f) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                text = "COSMIC SPATIAL & ACOUSTICS PROCESSOR",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                color = theme.primaryAccent
+            )
+
+            // Stereo Width slider
+            Column {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("STEREO IMAGING / EXPANSION:", fontSize = 9.sp, color = Color.Gray, fontFamily = FontFamily.Monospace)
+                    Text("${spatialWidth.toInt()}%", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = theme.primaryAccent, fontFamily = FontFamily.Monospace)
+                }
+                Slider(
+                    value = spatialWidth,
+                    onValueChange = { spatialWidth = it },
+                    valueRange = 0f..200f,
+                    colors = SliderDefaults.colors(thumbColor = theme.primaryAccent, activeTrackColor = theme.primaryAccent, inactiveTrackColor = theme.trackBackground)
+                )
+            }
+
+            // Virtual Room Size Slider
+            Column {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("AMBIENT DECAY ROOM SIZE:", fontSize = 9.sp, color = Color.Gray, fontFamily = FontFamily.Monospace)
+                    Text("${roomSize.toInt()}%", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = theme.primaryAccent, fontFamily = FontFamily.Monospace)
+                }
+                Slider(
+                    value = roomSize,
+                    onValueChange = { roomSize = it },
+                    valueRange = 10f..100f,
+                    colors = SliderDefaults.colors(thumbColor = theme.primaryAccent, activeTrackColor = theme.primaryAccent, inactiveTrackColor = theme.trackBackground)
+                )
+            }
+
+            // Echo Delay Slider
+            Column {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("SPATIAL FEEDBACK DELAY:", fontSize = 9.sp, color = Color.Gray, fontFamily = FontFamily.Monospace)
+                    Text("${echoDelay.toInt()} ms", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = theme.primaryAccent, fontFamily = FontFamily.Monospace)
+                }
+                Slider(
+                    value = echoDelay,
+                    onValueChange = { echoDelay = it },
+                    valueRange = 0f..500f,
+                    colors = SliderDefaults.colors(thumbColor = theme.primaryAccent, activeTrackColor = theme.primaryAccent, inactiveTrackColor = theme.trackBackground)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Peak Limiter configuration panel, providing secondary brickwall safety clamps.
  */
 @Composable
 fun LimiterPanel(
@@ -1130,8 +1634,8 @@ fun LimiterPanel(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Text(
-                text = "PEAK LIMITER & ENVELOPE CONTROLS",
-                fontSize = 12.sp,
+                text = "BRICKWALL PEAK LIMITER (PRO ENVELOPE)",
+                fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace,
                 color = theme.primaryAccent
@@ -1143,8 +1647,8 @@ fun LimiterPanel(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("THRESHOLD (LIMIT):", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = FontFamily.Monospace)
-                    Text("${String.format("%.1f", settings.limiterThresholdDb)} dB", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = theme.primaryAccent, fontFamily = FontFamily.Monospace)
+                    Text("BRICKWALL CLAMP (DB):", fontSize = 9.sp, color = Color.Gray, fontFamily = FontFamily.Monospace)
+                    Text("${String.format(java.util.Locale.US, "%.1f", settings.limiterThresholdDb)} dB", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = theme.primaryAccent, fontFamily = FontFamily.Monospace)
                 }
                 Slider(
                     value = settings.limiterThresholdDb,
@@ -1155,50 +1659,14 @@ fun LimiterPanel(
                 )
             }
 
-            // Attack (ms Slider)
-            Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("ATTACK TIME:", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = FontFamily.Monospace)
-                    Text("${String.format("%.1f", settings.limiterAttackMs)} ms", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = theme.primaryAccent, fontFamily = FontFamily.Monospace)
-                }
-                Slider(
-                    value = settings.limiterAttackMs,
-                    onValueChange = { viewModel.updateLimiterParams(it, settings.limiterReleaseMs, settings.limiterThresholdDb, settings.limiterKneeDb) },
-                    valueRange = 0.1f..25f,
-                    colors = SliderDefaults.colors(thumbColor = theme.primaryAccent, activeTrackColor = theme.primaryAccent, inactiveTrackColor = theme.trackBackground),
-                    modifier = Modifier.testTag("slider_attack")
-                )
-            }
-
-            // Release (ms Slider)
-            Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("RELEASE TIME:", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = FontFamily.Monospace)
-                    Text("${settings.limiterReleaseMs.toInt()} ms", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = theme.primaryAccent, fontFamily = FontFamily.Monospace)
-                }
-                Slider(
-                    value = settings.limiterReleaseMs,
-                    onValueChange = { viewModel.updateLimiterParams(settings.limiterAttackMs, it, settings.limiterThresholdDb, settings.limiterKneeDb) },
-                    valueRange = 10f..500f,
-                    colors = SliderDefaults.colors(thumbColor = theme.primaryAccent, activeTrackColor = theme.primaryAccent, inactiveTrackColor = theme.trackBackground),
-                    modifier = Modifier.testTag("slider_release")
-                )
-            }
-
             // Soft Knee (dB Slider)
             Column {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("SOFT KNEE WIDTH:", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = FontFamily.Monospace)
-                    Text("${String.format("%.1f", settings.limiterKneeDb)} dB", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = theme.primaryAccent, fontFamily = FontFamily.Monospace)
+                    Text("SOFT KNEE WIDTH (CLIP COEFF):", fontSize = 9.sp, color = Color.Gray, fontFamily = FontFamily.Monospace)
+                    Text("${String.format(java.util.Locale.US, "%.1f", settings.limiterKneeDb)} dB", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = theme.primaryAccent, fontFamily = FontFamily.Monospace)
                 }
                 Slider(
                     value = settings.limiterKneeDb,
@@ -1208,225 +1676,24 @@ fun LimiterPanel(
                     modifier = Modifier.testTag("slider_knee")
                 )
             }
-        }
-    }
-}
-
-/**
- * Custom Installation Routing Order panel (drag/click configuration)
- */
-@Composable
-fun CustomRoutingPanel(
-    viewModel: AudioDspViewModel,
-    settings: DspSettings,
-    theme: com.example.ui.theme.DspTheme
-) {
-    val routingList = settings.getRoutingList().toMutableList()
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-    ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                text = "CUSTOM DSP INSTALLATION ROUTING",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
-                color = theme.primaryAccent
-            )
-            
-            Text(
-                text = "Customize the processing sequence of effects. Tap arrows to rearrange the signal chain order dynamically in real-time.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            // Vertical list of effects order
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                routingList.forEachIndexed { idx, item ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(theme.trackBackground)
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(24.dp)
-                                    .clip(CircleShape)
-                                    .background(theme.primaryAccent),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "${idx + 1}",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp,
-                                    color = Color.Black,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                            }
-
-                            Text(
-                                text = when (item) {
-                                    "EQ" -> "18-BAND EQUALIZER"
-                                    "CROSSOVER" -> "4-WAY LR CROSSOVER"
-                                    "LIMITER" -> "PEAK LIMITER & COMP"
-                                    "FADER" -> "MASTER VOLUME & MUTE"
-                                    else -> item
-                                },
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontFamily = FontFamily.Monospace
-                            )
-                        }
-
-                        // Order Shifter buttons
-                        Row {
-                            IconButton(
-                                onClick = {
-                                    if (idx > 0) {
-                                        val temp = routingList[idx]
-                                        routingList[idx] = routingList[idx - 1]
-                                        routingList[idx - 1] = temp
-                                        viewModel.updateRoutingOrder(routingList)
-                                    }
-                                },
-                                enabled = idx > 0,
-                                modifier = Modifier.size(24.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.KeyboardArrowUp,
-                                    contentDescription = "Move Up",
-                                    tint = if (idx > 0) theme.primaryAccent else Color.Gray,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-
-                            IconButton(
-                                onClick = {
-                                    if (idx < routingList.lastIndex) {
-                                        val temp = routingList[idx]
-                                        routingList[idx] = routingList[idx + 1]
-                                        routingList[idx + 1] = temp
-                                        viewModel.updateRoutingOrder(routingList)
-                                    }
-                                },
-                                enabled = idx < routingList.lastIndex,
-                                modifier = Modifier.size(24.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.KeyboardArrowDown,
-                                    contentDescription = "Move Down",
-                                    tint = if (idx < routingList.lastIndex) theme.primaryAccent else Color.Gray,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * System Audio Capture tech overview panel
- */
-@Composable
-fun SystemCapturePanel(
-    viewModel: AudioDspViewModel,
-    settings: DspSettings,
-    theme: com.example.ui.theme.DspTheme
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-    ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                text = "AUDIO PLAYBACK CAPTURE & ARCHITECTURE",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
-                color = theme.primaryAccent
-            )
-
-            Text(
-                text = "ABOUT THE ENGINE:",
-                fontSize = 10.sp,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                color = theme.secondaryAccent
-            )
-            
-            Text(
-                text = "BRO AUDIO captures real-time global system audio output from other music players (like Youtube or Spotify) leveraging the Android 10+ AudioPlaybackCapture API.\n\nAll arithmetic filters are calculated on raw IEEE 754 32-bit floats. Memory chunks and state arrays are pre-allocated during initialization, bypassing garbage-collector invocation during process loops to strictly avoid audio drops or glitch artifacts.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                lineHeight = 16.sp
-            )
 
             Spacer(modifier = Modifier.height(2.dp))
 
+            // Tech Specs description block
             Text(
-                text = "NATIVE NDK IMPLEMENTATION REFERENCE (C++ Oboe/AAudio):",
-                fontSize = 10.sp,
+                text = "TECHNICAL ARCHITECTURE NOTE:",
+                fontSize = 9.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
                 color = theme.secondaryAccent
             )
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFF07080B))
-                    .border(1.dp, Color(0xFF1B1E24), RoundedCornerShape(4.dp))
-                    .padding(8.dp)
-            ) {
-                Text(
-                    text = """
-// Audio callback function mapped to native systems
-oboe::DataCallbackResult onAudioReady(
-    oboe::AudioStream *oboeStream, 
-    void *audioData, 
-    int32_t numFrames
-) {
-    float *output = static_cast<float*>(audioData);
-    // 1. Process 18-band Peaking cascade
-    // 2. Filter 4-way Linkwitz-Riley Crossover
-    // 3. Glide Peak Limiter Envelope & soft clamp
-    // 4. Multiply Stereo Left/Right Faders
-    return oboe::DataCallbackResult::Continue;
-}
-                    """.trimIndent(),
-                    style = TextStyle(
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 9.sp,
-                        color = Color(0xFF9ECE6A)
-                    )
-                )
-            }
+            
+            Text(
+                text = "BRO AUDIO operates on real-time global virtual playbacks using low-latency AudioPlaybackCapture buffer streams. Filter arithmetic cascades raw floating-point calculations with zero thread allocations, ensuring glitch-free playback (<15ms) under active third-party players.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 14.sp
+            )
         }
     }
 }
